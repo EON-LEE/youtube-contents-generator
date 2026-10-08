@@ -1,0 +1,186 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "triggers": {
+      "Daily_learning": {
+        "type": "Recurrence",
+        "recurrence": {
+          "frequency": "Day",
+          "interval": 1,
+          "timeZone": "UTC",
+          "schedule": {
+            "hours": ["@parameters('learningHourUtc')"],
+            "minutes": [0]
+          }
+        }
+      }
+    },
+    "actions": {
+      "Initialize_analytics_status": {
+        "type": "InitializeVariable",
+        "inputs": { "variables": [ { "name": "analyticsStatus", "type": "string", "value": "Running" } ] },
+        "runAfter": {}
+      },
+      "Initialize_learn_status": {
+        "type": "InitializeVariable",
+        "inputs": { "variables": [ { "name": "learnStatus", "type": "string", "value": "Running" } ] },
+        "runAfter": { "Initialize_analytics_status": ["Succeeded"] }
+      },
+      "Main": {
+        "type": "Scope",
+        "runAfter": { "Initialize_learn_status": ["Succeeded"] },
+        "actions": {
+          "Get_job": {
+            "type": "Http",
+            "inputs": {
+              "method": "GET",
+              "uri": "https://management.azure.com@{parameters('jobResourceId')}?api-version=@{parameters('containerAppsApiVersion')}",
+              "authentication": { "type": "ManagedServiceIdentity", "audience": "https://management.azure.com/" }
+            },
+            "runAfter": {}
+          },
+          "Start_collect_analytics": {
+            "type": "Http",
+            "description": "Same job image and settings, args overridden to `collect-analytics` (ENTRYPOINT is `python -m story_pipeline studio`).",
+            "inputs": {
+              "method": "POST",
+              "uri": "https://management.azure.com@{parameters('jobResourceId')}/start?api-version=@{parameters('containerAppsApiVersion')}",
+              "headers": { "Content-Type": "application/json" },
+              "body": {
+                "containers": "@createArray(setProperty(first(body('Get_job')?['properties']?['template']?['containers']), 'args', createArray('collect-analytics')))"
+              },
+              "authentication": { "type": "ManagedServiceIdentity", "audience": "https://management.azure.com/" }
+            },
+            "runAfter": { "Get_job": ["Succeeded"] }
+          },
+          "Wait_for_collect_analytics": {
+            "type": "Until",
+            "expression": "@contains(createArray('Succeeded', 'Failed', 'Stopped', 'Degraded'), variables('analyticsStatus'))",
+            "limit": { "count": 120, "timeout": "PT2H" },
+            "actions": {
+              "Delay_analytics_poll": {
+                "type": "Wait",
+                "inputs": { "interval": { "count": 1, "unit": "Minute" } },
+                "runAfter": {}
+              },
+              "Get_analytics_execution": {
+                "type": "Http",
+                "inputs": {
+                  "method": "GET",
+                  "uri": "https://management.azure.com@{body('Start_collect_analytics')?['id']}?api-version=@{parameters('containerAppsApiVersion')}",
+                  "authentication": { "type": "ManagedServiceIdentity", "audience": "https://management.azure.com/" },
+                  "retryPolicy": { "type": "fixed", "count": 3, "interval": "PT30S" }
+                },
+                "runAfter": { "Delay_analytics_poll": ["Succeeded"] }
+              },
+              "Set_analytics_status": {
+                "type": "SetVariable",
+                "inputs": { "name": "analyticsStatus", "value": "@{coalesce(body('Get_analytics_execution')?['properties']?['status'], 'Running')}" },
+                "runAfter": { "Get_analytics_execution": ["Succeeded"] }
+              }
+            },
+            "runAfter": { "Start_collect_analytics": ["Succeeded"] }
+          },
+          "Analytics_succeeded": {
+            "type": "If",
+            "expression": { "and": [ { "equals": ["@variables('analyticsStatus')", "Succeeded"] } ] },
+            "actions": {},
+            "else": {
+              "actions": {
+                "Fail_analytics": {
+                  "type": "Terminate",
+                  "inputs": {
+                    "runStatus": "Failed",
+                    "runError": {
+                      "code": "CollectAnalyticsFailed",
+                      "message": "@{concat('collect-analytics execution ', body('Start_collect_analytics')?['name'], ' ended as ', variables('analyticsStatus'), '; learning skipped.')}"
+                    }
+                  },
+                  "runAfter": {}
+                }
+              }
+            },
+            "runAfter": { "Wait_for_collect_analytics": ["Succeeded"] }
+          },
+          "Start_learn": {
+            "type": "Http",
+            "inputs": {
+              "method": "POST",
+              "uri": "https://management.azure.com@{parameters('jobResourceId')}/start?api-version=@{parameters('containerAppsApiVersion')}",
+              "headers": { "Content-Type": "application/json" },
+              "body": {
+                "containers": "@createArray(setProperty(first(body('Get_job')?['properties']?['template']?['containers']), 'args', createArray('learn')))"
+              },
+              "authentication": { "type": "ManagedServiceIdentity", "audience": "https://management.azure.com/" }
+            },
+            "runAfter": { "Analytics_succeeded": ["Succeeded"] }
+          },
+          "Wait_for_learn": {
+            "type": "Until",
+            "expression": "@contains(createArray('Succeeded', 'Failed', 'Stopped', 'Degraded'), variables('learnStatus'))",
+            "limit": { "count": 120, "timeout": "PT2H" },
+            "actions": {
+              "Delay_learn_poll": {
+                "type": "Wait",
+                "inputs": { "interval": { "count": 1, "unit": "Minute" } },
+                "runAfter": {}
+              },
+              "Get_learn_execution": {
+                "type": "Http",
+                "inputs": {
+                  "method": "GET",
+                  "uri": "https://management.azure.com@{body('Start_learn')?['id']}?api-version=@{parameters('containerAppsApiVersion')}",
+                  "authentication": { "type": "ManagedServiceIdentity", "audience": "https://management.azure.com/" },
+                  "retryPolicy": { "type": "fixed", "count": 3, "interval": "PT30S" }
+                },
+                "runAfter": { "Delay_learn_poll": ["Succeeded"] }
+              },
+              "Set_learn_status": {
+                "type": "SetVariable",
+                "inputs": { "name": "learnStatus", "value": "@{coalesce(body('Get_learn_execution')?['properties']?['status'], 'Running')}" },
+                "runAfter": { "Get_learn_execution": ["Succeeded"] }
+              }
+            },
+            "runAfter": { "Start_learn": ["Succeeded"] }
+          },
+          "Learn_succeeded": {
+            "type": "If",
+            "expression": { "and": [ { "equals": ["@variables('learnStatus')", "Succeeded"] } ] },
+            "actions": {},
+            "else": {
+              "actions": {
+                "Fail_learn": {
+                  "type": "Terminate",
+                  "inputs": {
+                    "runStatus": "Failed",
+                    "runError": {
+                      "code": "LearnFailed",
+                      "message": "@{concat('learn execution ', body('Start_learn')?['name'], ' ended as ', variables('learnStatus'), '.')}"
+                    }
+                  },
+                  "runAfter": {}
+                }
+              }
+            },
+            "runAfter": { "Wait_for_learn": ["Succeeded"] }
+          }
+        }
+      },
+      "On_failure_alert": {
+        "type": "Terminate",
+        "description": "Failure branch; the failed run triggers the WorkflowRunsCompleted(status=Failed) metric alert and its email action group.",
+        "inputs": {
+          "runStatus": "Failed",
+          "runError": {
+            "code": "LearningOrchestrationFailed",
+            "message": "@{concat('Analytics/learning orchestration failed: ', take(string(result('Main')), 2000))}"
+          }
+        },
+        "runAfter": { "Main": ["Failed", "TimedOut"] }
+      }
+    },
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

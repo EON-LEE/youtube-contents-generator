@@ -1,0 +1,213 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "triggers": {
+      "Daily_episode": {
+        "type": "Recurrence",
+        "recurrence": {
+          "frequency": "Day",
+          "interval": 1,
+          "timeZone": "UTC",
+          "schedule": {
+            "hours": ["@parameters('episodeHourUtc')"],
+            "minutes": [0]
+          }
+        }
+      }
+    },
+    "actions": {
+      "Initialize_run_id": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            { "name": "runId", "type": "string", "value": "@{concat('episode-', formatDateTime(utcNow(), 'yyyy-MM-dd'))}" }
+          ]
+        },
+        "runAfter": {}
+      },
+      "Initialize_agent_status": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [ { "name": "agentStatus", "type": "string", "value": "running" } ]
+        },
+        "runAfter": { "Initialize_run_id": ["Succeeded"] }
+      },
+      "Initialize_job_status": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [ { "name": "jobStatus", "type": "string", "value": "Running" } ]
+        },
+        "runAfter": { "Initialize_agent_status": ["Succeeded"] }
+      },
+      "Main": {
+        "type": "Scope",
+        "runAfter": { "Initialize_job_status": ["Succeeded"] },
+        "actions": {
+          "Start_preproduction": {
+            "type": "Http",
+            "description": "Invoke the Foundry hosted agent (Invocations protocol). 202 = started/running, 200 = finished.",
+            "inputs": {
+              "method": "POST",
+              "uri": "@{parameters('projectEndpoint')}/agents/@{parameters('hostedAgent')}/endpoint/protocols/invocations?api-version=v1&agent_session_id=@{variables('runId')}",
+              "headers": { "Content-Type": "application/json" },
+              "body": { "message": { "run_id": "@{variables('runId')}" } },
+              "authentication": { "type": "ManagedServiceIdentity", "audience": "https://ai.azure.com" },
+              "retryPolicy": { "type": "fixed", "count": 3, "interval": "PT30S" }
+            },
+            "operationOptions": "DisableAsyncPattern",
+            "runAfter": {}
+          },
+          "Set_status_from_start": {
+            "type": "SetVariable",
+            "inputs": { "name": "agentStatus", "value": "@{coalesce(body('Start_preproduction')?['status'], 'failed')}" },
+            "runAfter": { "Start_preproduction": ["Succeeded"] }
+          },
+          "Wait_for_preproduction": {
+            "type": "Until",
+            "expression": "@not(equals(variables('agentStatus'), 'running'))",
+            "limit": { "count": 360, "timeout": "PT12H" },
+            "actions": {
+              "Delay_poll": {
+                "type": "Wait",
+                "inputs": { "interval": { "count": 2, "unit": "Minute" } },
+                "runAfter": {}
+              },
+              "Poll_preproduction": {
+                "type": "Http",
+                "inputs": {
+                  "method": "POST",
+                  "uri": "@{parameters('projectEndpoint')}/agents/@{parameters('hostedAgent')}/endpoint/protocols/invocations?api-version=v1&agent_session_id=@{variables('runId')}",
+                  "headers": { "Content-Type": "application/json" },
+                  "body": { "message": { "run_id": "@{variables('runId')}" } },
+                  "authentication": { "type": "ManagedServiceIdentity", "audience": "https://ai.azure.com" },
+                  "retryPolicy": { "type": "fixed", "count": 3, "interval": "PT30S" }
+                },
+                "operationOptions": "DisableAsyncPattern",
+                "runAfter": { "Delay_poll": ["Succeeded"] }
+              },
+              "Set_status_from_poll": {
+                "type": "SetVariable",
+                "inputs": { "name": "agentStatus", "value": "@{coalesce(body('Poll_preproduction')?['status'], 'failed')}" },
+                "runAfter": { "Poll_preproduction": ["Succeeded"] }
+              }
+            },
+            "runAfter": { "Set_status_from_start": ["Succeeded"] }
+          },
+          "Preproduction_completed": {
+            "type": "If",
+            "expression": { "and": [ { "equals": ["@variables('agentStatus')", "completed"] } ] },
+            "actions": {},
+            "else": {
+              "actions": {
+                "Fail_preproduction": {
+                  "type": "Terminate",
+                  "inputs": {
+                    "runStatus": "Failed",
+                    "runError": {
+                      "code": "PreproductionFailed",
+                      "message": "@{concat('Hosted agent run ', variables('runId'), ' ended as ', variables('agentStatus'), '. Check the story-studio traces in Application Insights.')}"
+                    }
+                  },
+                  "runAfter": {}
+                }
+              }
+            },
+            "runAfter": { "Wait_for_preproduction": ["Succeeded"] }
+          },
+          "Get_job": {
+            "type": "Http",
+            "inputs": {
+              "method": "GET",
+              "uri": "https://management.azure.com@{parameters('jobResourceId')}?api-version=@{parameters('containerAppsApiVersion')}",
+              "authentication": { "type": "ManagedServiceIdentity", "audience": "https://management.azure.com/" }
+            },
+            "runAfter": { "Preproduction_completed": ["Succeeded"] }
+          },
+          "Run_id_env": {
+            "type": "Compose",
+            "inputs": { "name": "STUDIO_RUN_ID", "value": "@{variables('runId')}" },
+            "runAfter": { "Get_job": ["Succeeded"] }
+          },
+          "Start_render_job": {
+            "type": "Http",
+            "description": "Jobs - Start with an execution template: the job's own container plus STUDIO_RUN_ID. 200 returns the execution id; a 202 is followed by the built-in async polling.",
+            "inputs": {
+              "method": "POST",
+              "uri": "https://management.azure.com@{parameters('jobResourceId')}/start?api-version=@{parameters('containerAppsApiVersion')}",
+              "headers": { "Content-Type": "application/json" },
+              "body": {
+                "containers": "@createArray(setProperty(first(body('Get_job')?['properties']?['template']?['containers']), 'env', union(coalesce(first(body('Get_job')?['properties']?['template']?['containers'])?['env'], createArray()), createArray(outputs('Run_id_env')))))"
+              },
+              "authentication": { "type": "ManagedServiceIdentity", "audience": "https://management.azure.com/" }
+            },
+            "runAfter": { "Run_id_env": ["Succeeded"] }
+          },
+          "Wait_for_render_job": {
+            "type": "Until",
+            "expression": "@contains(createArray('Succeeded', 'Failed', 'Stopped', 'Degraded'), variables('jobStatus'))",
+            "limit": { "count": 300, "timeout": "PT5H" },
+            "actions": {
+              "Delay_job_poll": {
+                "type": "Wait",
+                "inputs": { "interval": { "count": 1, "unit": "Minute" } },
+                "runAfter": {}
+              },
+              "Get_execution": {
+                "type": "Http",
+                "inputs": {
+                  "method": "GET",
+                  "uri": "https://management.azure.com@{body('Start_render_job')?['id']}?api-version=@{parameters('containerAppsApiVersion')}",
+                  "authentication": { "type": "ManagedServiceIdentity", "audience": "https://management.azure.com/" },
+                  "retryPolicy": { "type": "fixed", "count": 3, "interval": "PT30S" }
+                },
+                "runAfter": { "Delay_job_poll": ["Succeeded"] }
+              },
+              "Set_job_status": {
+                "type": "SetVariable",
+                "inputs": { "name": "jobStatus", "value": "@{coalesce(body('Get_execution')?['properties']?['status'], 'Running')}" },
+                "runAfter": { "Get_execution": ["Succeeded"] }
+              }
+            },
+            "runAfter": { "Start_render_job": ["Succeeded"] }
+          },
+          "Render_job_succeeded": {
+            "type": "If",
+            "expression": { "and": [ { "equals": ["@variables('jobStatus')", "Succeeded"] } ] },
+            "actions": {},
+            "else": {
+              "actions": {
+                "Fail_render_job": {
+                  "type": "Terminate",
+                  "inputs": {
+                    "runStatus": "Failed",
+                    "runError": {
+                      "code": "RenderJobFailed",
+                      "message": "@{concat('Job execution ', body('Start_render_job')?['name'], ' ended as ', variables('jobStatus'), ' for run ', variables('runId'), '.')}"
+                    }
+                  },
+                  "runAfter": {}
+                }
+              }
+            },
+            "runAfter": { "Wait_for_render_job": ["Succeeded"] }
+          }
+        }
+      },
+      "On_failure_alert": {
+        "type": "Terminate",
+        "description": "Failure branch. A failed run raises the WorkflowRunsCompleted(status=Failed) metric alert, which emails the owner through the action group (infra/modules/logicapp.bicep). To also send mail from here, add an Office 365 Outlook 'Send an email (V2)' action before this one (requires an API connection).",
+        "inputs": {
+          "runStatus": "Failed",
+          "runError": {
+            "code": "StudioOrchestrationFailed",
+            "message": "@{concat('Episode orchestration failed for ', variables('runId'), ': ', take(string(result('Main')), 2000))}"
+          }
+        },
+        "runAfter": { "Main": ["Failed", "TimedOut"] }
+      }
+    },
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

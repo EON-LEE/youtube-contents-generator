@@ -20,6 +20,7 @@ def parser() -> argparse.ArgumentParser:
     )
     result.add_argument("--workspace", type=Path, default=Path(".story-pipeline"))
     commands = result.add_subparsers(dest="command", required=True)
+    commands.add_parser("studio", help="Autonomous agent-team studio (see `studio --help`).")
     plan = commands.add_parser("plan", help="Create a simulated episode; no API calls.")
     plan.add_argument("episode")
     plan.add_argument("--concept", required=True)
@@ -64,6 +65,10 @@ def parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv[:1] == ["studio"]:
+        from .studio.cli import main as studio_main
+        return studio_main(argv[1:])
     args = parser().parse_args(argv)
     store = None
     try:

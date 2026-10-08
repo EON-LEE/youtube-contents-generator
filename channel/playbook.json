@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "version": 1,
+  "lessons": [
+    {
+      "id": "L0001",
+      "text": "컷은 장소만 보여 주는 일반 그림 대신 이야기 속 물건과 손동작(열쇠, 근무표, 편지, 바느질)을 보여 줘라.",
+      "roles": [
+        "art-director",
+        "director"
+      ],
+      "confidence": "low",
+      "evidence": [
+        {
+          "episode": "changed-lock-v2",
+          "note": "v1은 장면당 1장(평균 91초)이라 단조로웠고, v2는 서사 앵커 56컷으로 장면 행동을 보여 줬다."
+        }
+      ],
+      "created": "2026-10-09",
+      "retired": false,
+      "retired_reason": null
+    },
+    {
+      "id": "L0002",
+      "text": "컷 전환은 같은 시간 간격이 아니라 내레이션에서 행동·감정이 바뀌는 문장에 맞춰라.",
+      "roles": [
+        "director"
+      ],
+      "confidence": "low",
+      "evidence": [
+        {
+          "episode": "changed-lock-v2",
+          "note": "v2 스토리보드는 내레이션 앵커 기준으로 컷을 나눴다."
+        }
+      ],
+      "created": "2026-10-09",
+      "retired": false,
+      "retired_reason": null
+    },
+    {
+      "id": "L0003",
+      "text": "컷 수를 늘리는 것만으로 시청 지속률이 오른다고 가정하지 마라. 성과 데이터로 확인하라.",
+      "roles": [
+        "director",
+        "performance-analyst"
+      ],
+      "confidence": "low",
+      "evidence": [
+        {
+          "episode": "changed-lock-v2",
+          "note": "README: 컷 증가는 지속률 개선의 증거가 아니다."
+        }
+      ],
+      "created": "2026-10-09",
+      "retired": false,
+      "retired_reason": null
+    },
+    {
+      "id": "L0004",
+      "text": "1초 미만으로 지나가는 짧은 자막 문장을 만들지 마라. 아주 짧은 문장은 앞뒤 문장과 이어 써라.",
+      "roles": [
+        "scene-writer",
+        "script-doctor"
+      ],
+      "confidence": "low",
+      "evidence": [
+        {
+          "episode": "changed-lock-v2",
+          "note": "v1에는 1초 미만 자막이 8개 있었고 v2에서 병합과 연장으로 0개가 됐다."
+        }
+      ],
+      "created": "2026-10-09",
+      "retired": false,
+      "retired_reason": null
+    },
+    {
+      "id": "L0005",
+      "text": "전화, 메시지, 방 상태처럼 장면을 구분하는 세부 사항은 컷 지시에 명시하라.",
+      "roles": [
+        "director"
+      ],
+      "confidence": "low",
+      "evidence": [
+        {
+          "episode": "changed-lock-v2",
+          "note": "v2는 메시지/통화, 습한 방/마른 방을 구분하지 않으면 잘못된 그림이 나왔다."
+        }
+      ],
+      "created": "2026-10-09",
+      "retired": false,
+      "retired_reason": null
+    }
+  ]
+}

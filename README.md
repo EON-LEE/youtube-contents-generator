@@ -1,18 +1,21 @@
 # Illustrated story workflow and local video production
 
 **Moving to another machine:** see [MIGRATION.md](MIGRATION.md) for setup,
-the private release containing both completed videos and production artifacts,
+the public release containing both completed videos and production artifacts,
 checksum verification, and the remaining Azure integration work.
 
-Two deliberately separate paths are available:
+Three paths are available:
 
 - **Offline simulator:** role contracts, persistent state and virtual cost gates
   using fixed fixtures. No external calls or media.
 - **Actual local production:** original Korean episode JSON → two real narration
   voices → original locally drawn illustrations → burned-in subtitles and a
   local MP4 → technical and optional local speech-recognition evaluation.
+- **Autonomous studio (code complete, not yet deployed):** a self-improving team of
+  Foundry agents produces episodes end to end and uploads approved ones to YouTube
+  as **private** videos. See [Autonomous studio](#autonomous-studio).
 
-**There is no YouTube connection, authentication, upload or publishing command.**
+The local production path has no YouTube connection, authentication or upload.
 The actual production path uses Microsoft Edge online speech through `edge-tts`
 with explicit permission. It is **not an authenticated Azure Speech integration**.
 No Azure credentials were available for the sample; no cloud resources were
@@ -305,13 +308,64 @@ reviews, persistence, bounded retries, interrupted recovery, artifact integrity,
 revision invalidation, workspace locking, missing prices, virtual budget blocking,
 cash-only economics and rejection of live providers.
 
+## Autonomous studio
+
+`src/story_pipeline/studio/` turns the one-shot local path into a team that
+improves itself. Nothing is deployed yet; Azure resources, model access and the
+YouTube OAuth grant are prerequisites (see [infra/README.md](infra/README.md)).
+
+**Inside one episode (bounded loops, never one-shot):**
+
+1. Trend researcher (web search, sources required) → performance analyst → showrunner brief.
+2. Three concept writers on different model families compete; two judges from other
+   families score them; below threshold, writers retry with the judges' notes.
+3. Outline → scene-by-scene draft → five critics (continuity, engagement, Korean,
+   originality, policy) → arbiter resolves conflicting notes → script doctor revises
+   only targeted scenes → critics again, until every axis passes, progress plateaus,
+   or the round cap is hit (then the episode stops).
+4. Director storyboards with narration anchors (validated, retried with the error),
+   voice director casts Azure Speech voices, art director builds style guide and
+   character reference sheets.
+5. Azure Speech synthesis; measured duration outside 20–30 minutes sends the script
+   back with a measured character target. Images are generated per shot, reviewed
+   by a vision critic, and only failed shots are regenerated.
+6. Licensed music/SFX mix (-14 LUFS), 1080p render, thumbnail, Shorts, captions,
+   YouTube metadata with chapters and AI disclosure.
+7. An independent final judge plus technical checks decide. Failing episodes are
+   never uploaded. Passing ones are uploaded **private** with synthetic-media
+   disclosure.
+
+**Across episodes:** a retrospective agent writes lessons to a versioned playbook
+(read by every agent via file search); after analytics arrive a second retrospective
+runs; rubric axes are calibrated against real retention; agent instruction changes
+are promoted only when they beat the current version on held-out data, and rolled
+back if retention drops.
+
+Every model call reserves real money in a per-episode ledger first (USD 10 cap in
+`studio.toml`). Writers and their reviewers must use different model families
+(`roster.check_independence`). Model names and prices in `studio.toml` are
+placeholders until `python -m story_pipeline studio check-models` passes.
+
+```powershell
+python -m story_pipeline studio check-models
+python -m story_pipeline studio deploy-agents
+$env:STUDIO_RUN_ID = "ep-2026-10-09"; python -m story_pipeline studio job
+python -m story_pipeline studio collect-analytics
+python -m story_pipeline studio learn
+```
+
+Uploads happen only when `STUDIO_UPLOAD=private`. Background music and effects must
+come from a `library/` with license evidence per file (`library.json`); files without
+commercial-use evidence are rejected.
+
 ## Scope boundaries
 
 Actual **local** production and evaluation are now authorized and implemented
 separately from the simulator. Cloud provisioning, paid provider billing and
-platform publishing are not implicitly enabled. There is no implemented YouTube
-adapter. The sample's quality and technical measurements do not establish
-revenue, retention, target-age demographics or viral potential.
+platform publishing are not implicitly enabled. The local path has no YouTube
+adapter; the studio uploads only as private. The sample's quality and technical
+measurements do not establish revenue, retention, target-age demographics or
+viral potential.
 
 YouTube API uploads from unverified projects created after 2020-07-28 are
 restricted to private viewing until the project passes an audit. A local review

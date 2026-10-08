@@ -14,6 +14,7 @@ import wave
 from pathlib import Path
 from typing import Any
 
+from .fonts import font_family, korean_font
 from .models import PipelineError, canonical, digest
 
 VOICES = {"mother": "ko-KR-SunHiNeural", "son": "ko-KR-InJoonNeural"}
@@ -292,7 +293,7 @@ def ass_text(text: str) -> str:
     return text.replace("\\", "＼").replace("{", "｛").replace("}", "｝").replace("\n", r"\N")
 
 
-def write_ass(path: Path, captions: list[dict[str, Any]]) -> None:
+def write_ass(path: Path, captions: list[dict[str, Any]], *, font_name: str = "Malgun Gothic") -> None:
     header = """[Script Info]
 ScriptType: v4.00+
 PlayResX: 1280
@@ -302,12 +303,12 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Narration,Malgun Gothic,40,&H00F3F6F8,&H00F3F6F8,&H001B2330,&H001B2330,0,0,0,0,100,100,0,0,1,2,0,2,70,70,28,1
-Style: Notice,Malgun Gothic,18,&H00A7BEC8,&H00A7BEC8,&H001B2330,&H001B2330,0,0,0,0,100,100,0,0,1,0,0,7,24,24,572,1
+Style: Narration,__FONT__,40,&H00F3F6F8,&H00F3F6F8,&H001B2330,&H001B2330,0,0,0,0,100,100,0,0,1,2,0,2,70,70,28,1
+Style: Notice,__FONT__,18,&H00A7BEC8,&H00A7BEC8,&H001B2330,&H001B2330,0,0,0,0,100,100,0,0,1,0,0,7,24,24,572,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-"""
+""".replace("__FONT__", font_name.replace(",", " "))
     events = [
         f"Dialogue: 0,{timestamp(cue['start'], ass=True)},{timestamp(cue['end'], ass=True)},Narration,,0,0,0,,{ass_text(cue['text'])}"
         for cue in captions
@@ -563,7 +564,7 @@ def write_shot_contact_sheet(output: Path, timeline: list[dict[str, Any]]) -> No
     columns, tile_width, tile_height = 4, 480, 290
     contact = Image.new("RGB", (columns * tile_width, math.ceil(len(timeline) / columns) * tile_height), "#172b3a")
     draw = ImageDraw.Draw(contact)
-    font = ImageFont.truetype(r"C:\Windows\Fonts\malgun.ttf", 17)
+    font = ImageFont.truetype(str(korean_font()), 17)
     for index, shot in enumerate(timeline):
         image = output / "scenes" / f"{shot['scene']}-shot-{shot['id']}.png"
         if not image.is_file():
@@ -712,12 +713,11 @@ async def produce_local(
             "Revise the story or speech rate; do not pad with artificial silence."
         )
     from .illustrations import render_cover, render_scene
-    font = Path(r"C:\Windows\Fonts\malgun.ttf")
-    if not font.is_file():
-        raise PipelineError("A Korean font is required. This renderer expects Windows Malgun Gothic.")
+    font = korean_font()
+    family = font_family(font)
     fonts = directory / "fonts"
     fonts.mkdir(exist_ok=True)
-    copied_font = fonts / "malgun.ttf"
+    copied_font = fonts / font.name
     shutil.copyfile(font, copied_font)
     render_cover(episode, output / "cover.png")
     chapter_starts = []
@@ -738,6 +738,8 @@ async def produce_local(
         else:
             render_scene(scene, episode, directory / f"{scene['id']}.png")
         chapter_starts.append(elapsed)
+        # Same bytes on Windows (Malgun Gothic); elsewhere the ASS must name the resolved family.
+        write_ass(directory / f"{scene['id']}.ass", audio["captions"], font_name=family)
         captions.extend({**cue, "start": cue["start"] + elapsed, "end": cue["end"] + elapsed} for cue in audio["captions"])
         elapsed += render_clip(ffmpeg, scene, audio, directory, timeline)
     copied_font.unlink()

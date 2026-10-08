@@ -20,12 +20,13 @@ illustrations, aligns subtitles, and produces a local MP4 using FFmpeg.
 - Goal: KRW 1,000,000 monthly pretax cash profit after actual operating costs,
   excluding owner labor. Audience response and profit are not verified.
 
-## Private release assets
+## Release assets
 
 Release: [local-video-handoff-2026-10-02](https://github.com/EON-LEE/youtube-contents-generator/releases/tag/local-video-handoff-2026-10-02).
 
-The release is in this private repository; access requires repository permission.
-Its ZIP keeps large media out of Git history. A clone alone does not download it.
+The repository became public on 2026-10-08, so anyone can download this release,
+including the `research\` folder. Its ZIP keeps large media out of Git history.
+A clone alone does not download it.
 
 Assets:
 

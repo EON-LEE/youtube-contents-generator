@@ -1,0 +1,26 @@
+# Agent manifest in the format of the Agent Framework hosted-agent samples
+# (python/samples/04-hosting/foundry-hosted-agents/*/agent.manifest.yaml), usable with
+#   azd ai agent init -m infra/hosted-agent/agent.manifest.yaml
+# The workflow calls the 25 prompt agents by name through the project Responses API,
+# so no model resource is declared here; deploy those with `studio deploy-agents`.
+name: story-studio
+description: >
+  Korean audio-drama preproduction studio: an Agent Framework functional workflow
+  wrapping the deterministic multi-agent pipeline (plan, concept, outline, draft,
+  critique/revise, direction, packaging) with budgets and quality gates.
+metadata:
+  tags:
+    - Agent Framework
+    - Functional Workflow
+    - Invocations Protocol
+template:
+  name: story-studio
+  kind: hosted
+  protocols:
+    - protocol: invocations
+      version: 2.0.0
+  environment_variables:
+    - name: STUDIO_STORAGE_ACCOUNT_URL
+      value: "{{STUDIO_STORAGE_ACCOUNT_URL}}"
+    - name: STUDIO_RUNS_CONTAINER
+      value: runs

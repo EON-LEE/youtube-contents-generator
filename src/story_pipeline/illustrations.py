@@ -5,10 +5,12 @@ Scene dictionaries accept ``visual_tag`` (or ``visual``), ``id``, ``title`` and
 """
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
+
+from .fonts import korean_font
+from .models import PipelineError
 
 CREAM, INK, CLAY, TEAL = "#f3e7cf", "#172b3a", "#bc684e", "#467c79"
 GOLD, PALE, SKIN, GREY = "#d6ad68", "#dfd2b5", "#dcaa89", "#b4b6af"
@@ -17,23 +19,11 @@ TAGS = ("door", "kitchen", "letter", "bus", "workshop", "rain", "table",
 
 
 def _font(size: int, bold: bool = False):
-    root = Path(os.sep)
-    candidates = [
-        Path(r"C:\Windows\Fonts") / ("malgunbd.ttf" if bold else "malgun.ttf"),
-        Path(r"C:\Windows\Fonts") / "malgun.ttf",
-        root / "usr" / "share" / "fonts" / "opentype" / "noto" / (
-            "NotoSansCJK-Bold.ttc" if bold else "NotoSansCJK-Regular.ttc"),
-        root / "usr" / "share" / "fonts" / "truetype" / "nanum" / (
-            "NanumGothicBold.ttf" if bold else "NanumGothic.ttf"),
-        root / "usr" / "share" / "fonts" / "truetype" / "noto" / "NotoSansKR-Regular.ttf",
-    ]
-    for path in candidates:
-        if path.is_file():
-            return ImageFont.truetype(str(path), size)
-    raise RuntimeError(
-        "Korean illustration font missing. Install Malgun Gothic, "
-        "Noto Sans CJK, Noto Sans KR, or Nanum Gothic in a supported font path."
-    )
+    try:
+        path = korean_font(bold)
+    except PipelineError as error:
+        raise RuntimeError(f"Korean illustration font missing. {error}") from error
+    return ImageFont.truetype(str(path), size)
 
 
 def _wrap(draw, text, font, width):

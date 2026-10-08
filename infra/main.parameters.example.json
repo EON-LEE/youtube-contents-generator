@@ -1,0 +1,35 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": { "value": "koreacentral" },
+    "foundryLocation": { "value": "eastus2" },
+    "namePrefix": { "value": "storystudio" },
+    "alertEmail": { "value": "owner@example.com" },
+    "budgetAmountUsd": { "value": 400 },
+    "modelDeployments": {
+      "value": [
+        { "name": "gpt-5.5", "format": "OpenAI", "model": "gpt-5.5", "version": "2026-04-24", "sku": "GlobalStandard", "capacity": 50 },
+        { "name": "gpt-5-mini", "format": "OpenAI", "model": "gpt-5-mini", "version": "2025-08-07", "sku": "GlobalStandard", "capacity": 100 },
+        { "name": "claude-opus-5-5", "format": "Anthropic", "model": "claude-opus-5-5", "version": "2", "sku": "GlobalStandard", "capacity": 25 },
+        { "name": "claude-sonnet-5", "format": "Anthropic", "model": "claude-sonnet-5", "version": "2", "sku": "GlobalStandard", "capacity": 25 },
+        { "name": "deepseek-v3-2", "format": "DeepSeek", "model": "DeepSeek-V3.2", "version": "1", "sku": "GlobalStandard", "capacity": 50 },
+        { "name": "grok-4-1", "format": "xAI", "model": "grok-4-1-fast-reasoning", "version": "1", "sku": "GlobalStandard", "capacity": 50 }
+      ]
+    },
+    "imageDeployment": {
+      "value": { "name": "gpt-image-1", "format": "OpenAI", "model": "gpt-image-1", "version": "2025-04-15", "sku": "GlobalStandard", "capacity": 1 }
+    },
+    "anthropicProviderData": {
+      "value": { "organizationName": "<legal entity name>", "countryCode": "KR", "industry": "media" }
+    },
+    "jobImage": { "value": "" },
+    "jobTriggerType": { "value": "Manual" },
+    "jobCronExpression": { "value": "0 22 * * *" },
+    "deployOrchestrator": { "value": true },
+    "episodeHourUtc": { "value": 21 },
+    "learningHourUtc": { "value": 3 },
+    "deployerPrincipalId": { "value": "" },
+    "hostedAgentPrincipalId": { "value": "" }
+  }
+}

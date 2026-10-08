@@ -1,21 +1,28 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 from pathlib import Path
 import shutil
 import unittest
 from unittest.mock import patch
 from uuid import uuid4
 
-from PIL import Image, ImageDraw
+PIL_AVAILABLE = importlib.util.find_spec("PIL") is not None
+if PIL_AVAILABLE:
+    from PIL import Image, ImageDraw
+    from story_pipeline import storyboard_art as art
 
-from story_pipeline import storyboard_art as art
 
-
+@unittest.skipUnless(PIL_AVAILABLE, "Pillow is not installed")
 class StoryboardArtTests(unittest.TestCase):
     def setUp(self):
         self.root = Path(__file__).parent / f".storyboard-{uuid4().hex}"
         self.addCleanup(lambda: shutil.rmtree(self.root, ignore_errors=True))
+        try:
+            art._font(20)
+        except RuntimeError as error:
+            self.skipTest(str(error))
 
     def test_all_subjects_distinct_deterministic_png_and_reserved_footer(self):
         hashes = set()
