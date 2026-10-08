@@ -1,7 +1,7 @@
 # Illustrated story workflow and local video production
 
 **Moving to another machine:** see [MIGRATION.md](MIGRATION.md) for setup,
-the private release containing both completed videos and production artifacts,
+the public release containing both completed videos and production artifacts,
 checksum verification, and the remaining Azure integration work.
 
 Two deliberately separate paths are available:
