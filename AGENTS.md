@@ -15,7 +15,13 @@ two-narrator family fiction) for a YouTube channel. Python package
    Pillow illustrations → FFmpeg MP4 with burned-in subtitles → technical checks.
 
 The two paths are not connected: the simulator's `produce` stage never feeds
-`produce-local`. There is no LLM, Azure, image-model, or YouTube integration.
+`produce-local`.
+
+3. **Autonomous studio** (`studio check-models|deploy-agents|job|collect-analytics|learn`):
+   25 Foundry prompt agents on mixed model families run bounded plan/write/critique/revise
+   loops, Azure Speech + Foundry images + FFmpeg produce the episode, a final gate decides,
+   approved episodes go to YouTube as **private** videos, and retrospectives grow a playbook.
+   Code is complete and tested offline; nothing is deployed yet (see `infra/README.md`).
 
 ## Key Files
 | File | Description |
@@ -24,6 +30,8 @@ The two paths are not connected: the simulator's `produce` stage never feeds
 | `MIGRATION.md` | Machine handoff, release-archive restore, planned Azure phase |
 | `pyproject.toml` | Package metadata; extras `media` (edge-tts, Pillow, imageio-ffmpeg) and `evaluation` (faster-whisper) |
 | `requirements-windows-py312.txt` | Constraints file from the working Windows/Python 3.12 environment |
+| `studio.toml` | Studio config: per-agent model deployments (placeholders), prices, loop caps, thresholds, USD 10/episode budget |
+| `Dockerfile` | Render/upload Container Apps Job image (`python -m story_pipeline studio job`) |
 | `.gitignore` | Excludes `outputs/`, `.story-pipeline/`, `.migration/`, secrets |
 
 ## Subdirectories
@@ -32,14 +40,16 @@ The two paths are not connected: the simulator's `produce` stage never feeds
 | `src/` | Package source (see `src/AGENTS.md`) |
 | `tests/` | `unittest` suite (see `tests/AGENTS.md`) |
 | `episodes/` | Hand-authored episode JSON inputs (see `episodes/AGENTS.md`) |
-| `.github/workflows/` | `tests.yml`: Windows + Python 3.12, installs `.[media]`, runs unittest on every push/PR |
+| `channel/` | Channel bible, rubrics, agent prompts, seed playbook (see `channel/AGENTS.md`) |
+| `infra/` | Bicep, Logic Apps workflows, hosted-agent packaging, deploy script (see `infra/README.md`) |
+| `.github/workflows/` | `tests.yml`: Windows + Ubuntu unittest; `deploy.yml`: OIDC deploy on main/manual (never on PRs) |
 
 ## For AI Agents
 
 ### Working In This Directory
 - Set `$env:PYTHONPATH = "$PWD\src"` and `$env:PYTHONIOENCODING = "utf-8"` before running anything.
 - Use a venv: `py -3.12 -m venv .venv; .\.venv\Scripts\python.exe -m pip install -c requirements-windows-py312.txt -e ".[media]"`.
-- Real rendering is Windows-only today: it requires `C:\Windows\Fonts\malgun.ttf`.
+- Real rendering resolves a Korean font via `fonts.korean_font()` (`STORY_FONT`, Malgun Gothic, Noto Sans CJK, Nanum).
 - `produce-local --allow-external-tts` sends narration to Microsoft's Edge service. Do not run it without the user's permission.
 - Never add a silent fallback (Edge, fixture, fake output) when a real provider fails; the codebase fails explicitly by design.
 - Do not commit `outputs/`; finished videos live in the GitHub release `local-video-handoff-2026-10-02`.

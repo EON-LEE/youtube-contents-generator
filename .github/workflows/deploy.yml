@@ -1,0 +1,130 @@
+name: Deploy
+
+# Never runs for pull requests: only manual dispatch and pushes to main.
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_hosted_agent:
+        description: Create a new story-studio hosted agent version
+        type: boolean
+        default: true
+  push:
+    branches: [main]
+    paths:
+      - "infra/**"
+      - "channel/**"
+      - "src/**"
+      - "studio.toml"
+      - "Dockerfile"
+      - "pyproject.toml"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+  PARAMETERS_FILE: ${{ vars.STUDIO_PARAMETERS_FILE || 'infra/main.parameters.json' }}
+  IMAGE_TAG: ${{ github.sha }}
+  PYTHONIOENCODING: utf-8
+
+jobs:
+  deploy:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Azure login (OIDC federated credential, no secrets)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Check inputs
+        run: |
+          test -n "$RESOURCE_GROUP" || { echo "Set repository variable AZURE_RESOURCE_GROUP"; exit 1; }
+          test -f "$PARAMETERS_FILE" || { echo "Missing $PARAMETERS_FILE (copy infra/main.parameters.example.json)"; exit 1; }
+          az config set extension.use_dynamic_install=yes_without_prompt
+
+      - name: Deploy infrastructure (keeps the current job image)
+        id: infra
+        run: |
+          set -euo pipefail
+          job=$(az resource list -g "$RESOURCE_GROUP" --resource-type Microsoft.App/jobs --query "[0].name" -o tsv || true)
+          image=""
+          if [ -n "$job" ]; then
+            image=$(az containerapp job show -g "$RESOURCE_GROUP" -n "$job" --query "properties.template.containers[0].image" -o tsv)
+            case "$image" in *.azurecr.io/*) ;; *) image="" ;; esac
+          fi
+          az deployment group create -g "$RESOURCE_GROUP" -n "story-studio-${GITHUB_RUN_ID}" \
+            -f infra/main.bicep -p "@$PARAMETERS_FILE" -p jobImage="$image" \
+            --query properties.outputs -o json > outputs.json
+          python - <<'PY'
+          import json, os
+          outputs = json.load(open("outputs.json"))
+          with open(os.environ["GITHUB_ENV"], "a") as env:
+              for key, value in outputs.items():
+                  if isinstance(value.get("value"), str):
+                      env.write(f"{key}={value['value']}\n")
+          PY
+
+      - name: Build images in ACR
+        run: |
+          az acr build -r "$ACR_NAME" -t "story-studio-job:$IMAGE_TAG" -f Dockerfile .
+          az acr build -r "$ACR_NAME" -t "story-studio-agent:$IMAGE_TAG" -f infra/hosted-agent/Dockerfile .
+
+      - name: Point the job at the new image
+        run: |
+          az containerapp job update -g "$RESOURCE_GROUP" -n "$CONTAINER_APPS_JOB_NAME" \
+            --image "$ACR_LOGIN_SERVER/story-studio-job:$IMAGE_TAG" --output none
+
+      - name: Deploy Logic Apps workflows
+        if: env.LOGIC_APP_NAME != ''
+        run: |
+          (cd infra/logicapp && zip -qr ../../logicapp.zip .)
+          az logicapp deployment source config-zip -g "$RESOURCE_GROUP" -n "$LOGIC_APP_NAME" --src logicapp.zip
+
+      - name: Install studio
+        run: python -m pip install --pre -e ".[studio,hosted]"
+
+      - name: Check model deployments
+        run: python -m story_pipeline studio check-models
+
+      - name: Deploy prompt agents and knowledge
+        run: python -m story_pipeline studio deploy-agents
+
+      - name: Deploy hosted agent version
+        if: github.event_name == 'push' || inputs.deploy_hosted_agent
+        run: |
+          python - <<'PY'
+          import json, os
+          from azure.ai.projects import AIProjectClient
+          from azure.identity import DefaultAzureCredential
+          from story_pipeline.studio.hosted import deploy_hosted_agent
+          project = AIProjectClient(endpoint=os.environ["FOUNDRY_PROJECT_ENDPOINT"], credential=DefaultAzureCredential())
+          version = deploy_hosted_agent(
+              project, f"{os.environ['ACR_LOGIN_SERVER']}/story-studio-agent:{os.environ['IMAGE_TAG']}",
+              environment={"STUDIO_STORAGE_ACCOUNT_URL": os.environ["STUDIO_STORAGE_ACCOUNT_URL"],
+                           "STUDIO_RUNS_CONTAINER": "runs"})
+          print(json.dumps({"name": version.name, "version": version.version}))
+          PY
+
+      - name: Keep the agents manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agents-manifest
+          path: agents-manifest.json
+          if-no-files-found: ignore

@@ -20,7 +20,8 @@
 
 ### Working In This Directory
 - Run from repo root: `$env:PYTHONPATH="$PWD\src"; python -m unittest discover -s tests -v`.
-- Tests that need FFmpeg, Pillow, or Malgun Gothic skip when they are missing, except `test_storyboard_art.py`, which imports Pillow at module level and errors instead.
+- Tests that need FFmpeg, Pillow, or a Korean font skip when they are missing.
+- Studio tests share builders in `studio_fixtures.py` (v3 episode, fake Azure synthesizer, licensed music/SFX libraries, frames); no Azure call is made.
 - Add a test for every new validation rule; tests assert that invalid input fails explicitly.
 
 ## Manual Notes

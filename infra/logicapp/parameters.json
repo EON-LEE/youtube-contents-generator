@@ -1,0 +1,26 @@
+{
+  "projectEndpoint": {
+    "type": "String",
+    "value": "@appsetting('STUDIO_PROJECT_ENDPOINT')"
+  },
+  "hostedAgent": {
+    "type": "String",
+    "value": "@appsetting('STUDIO_HOSTED_AGENT')"
+  },
+  "jobResourceId": {
+    "type": "String",
+    "value": "@appsetting('STUDIO_JOB_RESOURCE_ID')"
+  },
+  "episodeHourUtc": {
+    "type": "Int",
+    "value": "@appsetting('STUDIO_EPISODE_HOUR_UTC')"
+  },
+  "learningHourUtc": {
+    "type": "Int",
+    "value": "@appsetting('STUDIO_LEARNING_HOUR_UTC')"
+  },
+  "containerAppsApiVersion": {
+    "type": "String",
+    "value": "2024-03-01"
+  }
+}

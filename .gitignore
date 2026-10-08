@@ -15,3 +15,6 @@ outputs/
 *.pfx
 *.p12
 .migration/
+runs/
+library/
+agents-manifest.json

@@ -18,6 +18,26 @@ media = [
 evaluation = [
     "faster-whisper>=1.1,<2",
 ]
+studio = [
+    "azure-ai-projects>=2.8,<3",
+    "azure-identity>=1.19",
+    "openai>=1.99",
+    "azure-cognitiveservices-speech>=1.44",
+    "azure-keyvault-secrets>=4.8",
+    "azure-data-tables>=12.5",
+    "azure-storage-blob>=12.20",
+    "azure-monitor-opentelemetry>=1.6",
+]
+youtube = [
+    "google-api-python-client>=2.150",
+    "google-auth>=2.35",
+    "google-auth-oauthlib>=1.2",
+]
+# Pre-release hosting package: install with `pip install --pre -e .[studio,hosted]`.
+hosted = [
+    "agent-framework-core>=1.19,<2",
+    "agent-framework-foundry-hosting>=1.0.0b260918",
+]
 
 [project.scripts]
 story-pipeline = "story_pipeline.cli:main"

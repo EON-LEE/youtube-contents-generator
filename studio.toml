@@ -1,0 +1,96 @@
+# Studio configuration. Environment variables override endpoints:
+# FOUNDRY_PROJECT_ENDPOINT, FOUNDRY_IMAGE_DEPLOYMENT, SPEECH_ENDPOINT, SPEECH_REGION.
+#
+# Deployment names and prices below are PLACEHOLDERS chosen for the planned model mix.
+# `python -m story_pipeline studio check-models` must pass against the real Foundry
+# project (deployed names, region availability, current prices) before any live run.
+
+[foundry]
+project_endpoint = ""
+image_deployment = "gpt-image-1"
+
+[speech]
+endpoint = ""
+region = "koreacentral"
+
+[budget]
+episode_usd = 10
+
+[episode]
+# Measured on the v2 sample: 7,859 characters -> 1,296.5 s (about 6.06 characters/second).
+target_characters = [7300, 10500]
+
+[channel]
+directory = "channel"
+
+[loops]
+concept_rounds = 2
+script_rounds = 3
+minimum_improvement = 0.2
+direction_retries = 2
+art_retries_per_shot = 2
+final_retries = 1
+
+[thresholds]
+concept = 7.0
+script_axis = 7.0
+art = 7.0
+packaging = 7.0
+final = 7.5
+
+# One deployment per agent. Writers and their reviewers must be different model families.
+[agents]
+showrunner = "gpt-5.5"
+trend-researcher = "gpt-5-mini"
+performance-analyst = "gpt-5.5"
+concept-writer-a = "claude-opus-5-5"
+concept-writer-b = "gpt-5.5"
+concept-writer-c = "claude-sonnet-5"
+greenlight-judge-a = "deepseek-v3-2"
+greenlight-judge-b = "grok-4-1"
+outline-writer = "gpt-5.5"
+scene-writer = "claude-opus-5-5"
+critic-continuity = "gpt-5.5"
+critic-engagement = "gpt-5-mini"
+critic-korean = "gpt-5.5"
+critic-originality = "gpt-5-mini"
+critic-policy = "deepseek-v3-2"
+arbiter = "gpt-5.5"
+script-doctor = "claude-opus-5-5"
+director = "gpt-5.5"
+voice-director = "gpt-5-mini"
+art-director = "gpt-5.5"
+art-critic = "gpt-5-mini"
+packaging-agent = "gpt-5.5"
+click-judge = "claude-sonnet-5"
+final-judge = "grok-4-1"
+retrospective = "gpt-5.5"
+
+[prices]
+# USD. Conservative placeholders; replace with current Azure prices.
+image_per_call = 0.07
+speech_per_million_characters = 15
+
+[prices.models."gpt-5.5"]
+input_per_million = 5
+output_per_million = 40
+
+[prices.models."gpt-5-mini"]
+input_per_million = 0.5
+output_per_million = 4
+
+[prices.models."claude-opus-5-5"]
+input_per_million = 5
+output_per_million = 25
+
+[prices.models."claude-sonnet-5"]
+input_per_million = 3
+output_per_million = 15
+
+[prices.models."deepseek-v3-2"]
+input_per_million = 1
+output_per_million = 4
+
+[prices.models."grok-4-1"]
+input_per_million = 3
+output_per_million = 15
