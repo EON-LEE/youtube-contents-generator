@@ -50,10 +50,12 @@ class FoundryTransport:
             content = [{"role": "user", "content": [{"type": "input_text", "text": prompt}] + [
                 {"type": "input_image", "image_url": "data:image/png;base64," + base64.b64encode(image).decode("ascii")}
                 for image in images]}]
+        # The structured-output schema is baked into the agent's own definition
+        # (deploy_agents.py sets PromptAgentDefinition.text); the Responses API rejects a
+        # `text` parameter on the call itself once `agent_reference` names an agent.
         response = self._openai.responses.create(
             input=content,
             max_output_tokens=max_output_tokens,
-            text={"format": {"type": "json_schema", "name": schema_name, "schema": schema, "strict": True}},
             extra_body={"agent_reference": {"name": agent, "type": "agent_reference"}},
         )
         if getattr(response, "status", "completed") != "completed":

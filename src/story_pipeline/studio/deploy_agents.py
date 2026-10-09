@@ -15,7 +15,7 @@ from typing import Any, Iterable
 from ..models import PipelineError
 from .config import StudioConfig
 from .playbook import Playbook
-from .roster import ROSTER, AgentSpec, check_independence
+from .roster import ROSTER, SCHEMAS, AgentSpec, check_independence
 
 KNOWLEDGE_STORE = "channel-knowledge"
 DEFAULT_STATE = Path(".story-pipeline") / "knowledge-state.json"
@@ -211,6 +211,7 @@ def deploy_agents(project_client: Any, openai_client: Any, config: StudioConfig,
             "model": model,
             "instructions_sha256": sha256(instructions),
             "tools": _tool_fingerprint(spec.tools, store_id),
+            "schema": spec.schema,
         }
         fingerprint = _definition_sha256(entry)
         if not force:
@@ -221,10 +222,17 @@ def deploy_agents(project_client: Any, openai_client: Any, config: StudioConfig,
                 manifest["agents"][spec.name] = {"name": spec.name, "version": str(version), **entry,
                                                  "changed": False}
                 continue
+        # The structured-output schema is part of the agent DEFINITION, not the call: the
+        # Responses API rejects a per-call `text` parameter once `agent_reference` names an
+        # agent (`gateway.FoundryTransport` relies on this being baked in here).
+        text_options = models.PromptAgentDefinitionTextOptions(
+            format=models.TextResponseFormatJsonSchema(name=spec.schema, schema=SCHEMAS[spec.schema], strict=True)
+        )
         details = project_client.agents.create_version(
             agent_name=spec.name,
             definition=models.PromptAgentDefinition(model=model, instructions=instructions,
-                                                    tools=build_tools(spec.tools, store_id, models)),
+                                                    tools=build_tools(spec.tools, store_id, models),
+                                                    text=text_options),
             description=f"{spec.team} team; output schema {spec.schema}",
             metadata={"definition_sha256": fingerprint, "instructions_sha256": entry["instructions_sha256"],
                       "team": spec.team},
