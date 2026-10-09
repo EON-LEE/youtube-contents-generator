@@ -4,6 +4,15 @@ Model deployments come from configuration (``[agents]`` in studio.toml), so the
 mix of model families can change without code changes. Writers and the critics
 that judge them must use different model families; ``check_independence``
 enforces it.
+
+``critic-originality`` and ``packaging-agent`` are intentionally deployed WITHOUT
+``web_search`` even though their prompts describe using it: on Azure AI Foundry,
+the grok-4-1-fast-reasoning deployment rejects any Responses API call that
+includes the ``web_search`` tool with a 400 ``ApiSamplingErrorUnprocessableInput``
+(confirmed reproducible in isolation; the same deployment's ``file_search`` tool
+works fine). Reassigning these two roles to an OpenAI model to keep web_search
+would break ``check_independence`` (writers are already OpenAI). They fall back
+to the model's own knowledge instead of live search grounding.
 """
 from __future__ import annotations
 
@@ -111,7 +120,7 @@ ROSTER: tuple[AgentSpec, ...] = (
     AgentSpec("critic-continuity", "writing", "critic_continuity.md", "critique", (), "critics", 4000),
     AgentSpec("critic-engagement", "writing", "critic_engagement.md", "critique", ("file_search",), "critics", 4000),
     AgentSpec("critic-korean", "writing", "critic_korean.md", "critique", (), "critics", 4000),
-    AgentSpec("critic-originality", "writing", "critic_originality.md", "critique", ("web_search",), "critics", 16000),
+    AgentSpec("critic-originality", "writing", "critic_originality.md", "critique", (), "critics", 16000),
     AgentSpec("critic-policy", "writing", "critic_policy.md", "critique", (), "critics", 4000),
     AgentSpec("arbiter", "writing", "arbiter.md", "revision_plan", (), "", 4000),
     AgentSpec("script-doctor", "writing", "script_doctor.md", "revision", ("file_search",), "writers", 16000),
@@ -119,7 +128,7 @@ ROSTER: tuple[AgentSpec, ...] = (
     AgentSpec("voice-director", "direction", "voice_director.md", "casting", (), "", 2000),
     AgentSpec("art-director", "direction", "art_director.md", "art_direction", ("file_search",), "", 4000),
     AgentSpec("art-critic", "direction", "art_critic.md", "art_review", (), "", 1500),
-    AgentSpec("packaging-agent", "packaging", "packaging_agent.md", "packaging", ("web_search",), "packagers", 16000),
+    AgentSpec("packaging-agent", "packaging", "packaging_agent.md", "packaging", (), "packagers", 16000),
     AgentSpec("click-judge", "packaging", "click_judge.md", "click_scores", (), "", 2000),
     AgentSpec("final-judge", "packaging", "final_judge.md", "final_verdict", (), "", 3000),
     AgentSpec("retrospective", "learning", "retrospective.md", "retrospective", ("file_search",), "", 4000),

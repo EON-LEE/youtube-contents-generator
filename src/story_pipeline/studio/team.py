@@ -22,6 +22,27 @@ CONCEPT_WRITERS = ("concept-writer-a", "concept-writer-b", "concept-writer-c")
 CONCEPT_JUDGES = ("greenlight-judge-a", "greenlight-judge-b")
 
 
+def expand_scene_ids(raw: str, known_scenes: set[str]) -> list[str]:
+    """Some non-OpenAI model families collapse multiple scene IDs into one field,
+    e.g. ``"06,09,10"`` or a range like ``"10-12"``, instead of one decision per
+    scene. Expand those into the individual zero-padded IDs the rest of the
+    pipeline expects."""
+    ids: list[str] = []
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "-" in part and part not in known_scenes:
+            start, _, end = part.partition("-")
+            start, end = start.strip(), end.strip()
+            if start.isdigit() and end.isdigit():
+                width = len(start)
+                ids.extend(str(i).zfill(width) for i in range(int(start), int(end) + 1))
+                continue
+        ids.append(part)
+    return ids
+
+
 def prompt(task: str, **context: Any) -> str:
     return task.strip() + "\n\n```json\n" + json.dumps(context, ensure_ascii=False, indent=1) + "\n```"
 
@@ -209,7 +230,7 @@ class Studio:
                 plan = self.call("arbiter", "비평가 의견을 통합해 수정 계획을 세워라. 충돌하는 의견은 근거를 들어 하나로 정하라.",
                                  stage="arbitrate", iteration=round_index, reviews=reviews,
                                  lessons=self.lessons("arbiter"))
-                targets = {d["scene_id"] for d in plan["decisions"]}
+                targets = {scene_id for d in plan["decisions"] for scene_id in expand_scene_ids(d["scene_id"], set(scenes))}
                 if "all" in targets:
                     targets = set(scenes)
                 unknown = targets - set(scenes)
