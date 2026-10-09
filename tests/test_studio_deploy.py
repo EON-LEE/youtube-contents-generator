@@ -170,7 +170,7 @@ class DeployAgentsTest(unittest.TestCase):
         self.assertEqual(entry["version"], "1")
         self.assertEqual(entry["model"], self.config.model_for("critic-originality"))
         self.assertEqual(len(entry["instructions_sha256"]), 64)
-        self.assertEqual(entry["tools"], ["web_search"])
+        self.assertEqual(entry["tools"], [])
         self.assertTrue(all(item["changed"] for item in saved["agents"].values()))
 
     def test_second_deploy_is_a_no_op(self):

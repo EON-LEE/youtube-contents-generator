@@ -21,6 +21,10 @@ param deployerPrincipalId string = ''
 var cognitiveServicesUser = 'a97b65f3-24c7-4388-baec-2e87135dc908'
 var foundryUser = '53ca6127-db72-4b80-b1b0-d745d6d5456d'
 var foundryProjectManager = 'eadc314b-1a2d-4efa-be10-5d325db5065e'
+// Microsoft Entra auth for the Speech SDK (token_credential) needs this role specifically;
+// Cognitive Services User alone 401s on the synthesis WebSocket even though it covers the
+// OpenAI/Foundry data plane fine.
+var cognitiveServicesSpeechUser = 'f2dc8367-1007-4938-bd23-fe263f013447'
 
 resource account 'Microsoft.CognitiveServices/accounts@2025-10-01-preview' = {
   name: accountName
@@ -98,6 +102,16 @@ resource workloadCognitive 'Microsoft.Authorization/roleAssignments@2022-04-01' 
   }
 }
 
+resource workloadSpeech 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(account.id, workloadPrincipalId, cognitiveServicesSpeechUser)
+  scope: account
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesSpeechUser)
+    principalId: workloadPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 resource workloadFoundry 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(project.id, workloadPrincipalId, foundryUser)
   scope: project
@@ -115,6 +129,29 @@ resource deployerFoundry 'Microsoft.Authorization/roleAssignments@2022-04-01' = 
   scope: project
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', foundryProjectManager)
+    principalId: deployerPrincipalId
+  }
+}
+
+// Interacting with agent endpoints (running inference, including tool-using agents like
+// web_search) needs Foundry User in addition to Foundry Project Manager's publish rights.
+resource deployerFoundryUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(deployerPrincipalId)) {
+  name: guid(project.id, deployerPrincipalId, foundryUser)
+  scope: project
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', foundryUser)
+    principalId: deployerPrincipalId
+  }
+}
+
+// Local/manual production runs (infra/run_episode*.py) authenticate Speech as the
+// deployer's own Entra identity, not the workload managed identity; it needs the same
+// Speech-specific role as the workload above.
+resource deployerSpeech 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(deployerPrincipalId)) {
+  name: guid(account.id, deployerPrincipalId, cognitiveServicesSpeechUser)
+  scope: account
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesSpeechUser)
     principalId: deployerPrincipalId
   }
 }

@@ -34,7 +34,11 @@ class ImageClient(Protocol):
 
 
 class FoundryImageClient:
-    """gpt-image deployment reached through the Foundry project's OpenAI-compatible client."""
+    """gpt-image deployment reached through the Foundry account's plain Azure OpenAI
+    endpoint. The project-scoped Responses API client (``project.get_openai_client()``,
+    used for agent_reference text calls) 404s on ``images.generate``/``images.edit``;
+    only the account-level ``https://{account}.openai.azure.com/`` endpoint serves
+    image generation, confirmed by direct probing."""
 
     def __init__(self, config: StudioConfig, *, credential: Any = None, openai_client: Any = None):
         if not config.image_deployment:
@@ -43,12 +47,21 @@ class FoundryImageClient:
             if not config.project_endpoint:
                 raise PipelineError("Set [foundry].project_endpoint or FOUNDRY_PROJECT_ENDPOINT.")
             try:
-                from azure.ai.projects import AIProjectClient
-                from azure.identity import DefaultAzureCredential
+                from openai import AzureOpenAI
+                from azure.identity import DefaultAzureCredential, get_bearer_token_provider
             except ImportError as error:
-                raise PipelineError("Install azure-ai-projects and azure-identity for Foundry images.") from error
-            project = AIProjectClient(endpoint=config.project_endpoint, credential=credential or DefaultAzureCredential())
-            openai_client = project.get_openai_client()
+                raise PipelineError("Install openai and azure-identity for Foundry images.") from error
+            # The project endpoint looks like https://{account}.services.ai.azure.com/api/projects/{project};
+            # derive the account's own https://{account}.openai.azure.com/ endpoint from its host.
+            account_host = config.project_endpoint.split("://", 1)[-1].split("/", 1)[0]
+            account_name = account_host.split(".", 1)[0]
+            token_provider = get_bearer_token_provider(
+                credential or DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default")
+            openai_client = AzureOpenAI(
+                azure_endpoint=f"https://{account_name}.openai.azure.com/",
+                azure_ad_token_provider=token_provider,
+                api_version="2025-04-01-preview",
+            )
         self.client = openai_client
         self.deployment = config.image_deployment
 
