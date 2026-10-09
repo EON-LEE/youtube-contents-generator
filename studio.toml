@@ -39,31 +39,37 @@ packaging = 7.0
 final = 7.5
 
 # One deployment per agent. Writers and their reviewers must be different model families.
+# NOTE (2026-10-09): Claude (Anthropic) deployments are removed. This subscription
+# (ME-M365CPI74210306-eonlee-1, an M365 Developer Program sandbox) blocks paid Azure
+# Marketplace purchases by policy, and Anthropic models in Foundry are sold through
+# the Marketplace. DeepSeek and xAI/Grok are NOT blocked (verified by real deployment).
+# If a non-sandbox subscription is used later, Claude can be reintroduced; see
+# infra/main.parameters.json (claude entries removed from modelDeployments there too).
 [agents]
 showrunner = "gpt-5.5"
 trend-researcher = "gpt-5-mini"
 performance-analyst = "gpt-5.5"
-concept-writer-a = "claude-opus-5-5"
-concept-writer-b = "gpt-5.5"
-concept-writer-c = "claude-sonnet-5"
-greenlight-judge-a = "deepseek-v3-2"
-greenlight-judge-b = "grok-4-1"
+concept-writer-a = "deepseek-v3-2"
+concept-writer-b = "grok-4-1"
+concept-writer-c = "deepseek-v3-2"
+greenlight-judge-a = "gpt-5.5"
+greenlight-judge-b = "gpt-5-mini"
 outline-writer = "gpt-5.5"
-scene-writer = "claude-opus-5-5"
-critic-continuity = "gpt-5.5"
-critic-engagement = "gpt-5-mini"
-critic-korean = "gpt-5.5"
-critic-originality = "gpt-5-mini"
+scene-writer = "gpt-5.5"
+critic-continuity = "deepseek-v3-2"
+critic-engagement = "grok-4-1"
+critic-korean = "deepseek-v3-2"
+critic-originality = "grok-4-1"
 critic-policy = "deepseek-v3-2"
 arbiter = "gpt-5.5"
-script-doctor = "claude-opus-5-5"
+script-doctor = "gpt-5.5"
 director = "gpt-5.5"
 voice-director = "gpt-5-mini"
 art-director = "gpt-5.5"
-art-critic = "gpt-5-mini"
-packaging-agent = "gpt-5.5"
-click-judge = "claude-sonnet-5"
-final-judge = "grok-4-1"
+art-critic = "gpt-5.5"
+packaging-agent = "grok-4-1"
+click-judge = "gpt-5.5"
+final-judge = "deepseek-v3-2"
 retrospective = "gpt-5.5"
 
 [prices]
@@ -79,6 +85,10 @@ output_per_million = 40
 input_per_million = 0.5
 output_per_million = 4
 
+# Anthropic Claude models are deployed in infra/main.bicep but NOT used by any agent
+# above: this subscription blocks the Marketplace purchase they require (see the
+# [agents] note). Prices kept here so Claude can be reassigned without edits if a
+# non-sandbox subscription is used later.
 [prices.models."claude-opus-5-5"]
 input_per_million = 5
 output_per_million = 25

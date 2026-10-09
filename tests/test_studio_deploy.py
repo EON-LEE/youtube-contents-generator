@@ -49,6 +49,12 @@ class FakeModels:
     class PromptAgentDefinition(SimpleNamespace):
         pass
 
+    class PromptAgentDefinitionTextOptions(SimpleNamespace):
+        pass
+
+    class TextResponseFormatJsonSchema(SimpleNamespace):
+        pass
+
 
 class ResourceNotFoundError(Exception):
     status_code = 404
@@ -253,7 +259,7 @@ class CheckModelsTest(unittest.TestCase):
 
     def test_missing_deployment_raises(self):
         names = set(self.config.agent_models.values()) - {"grok-4-1"}
-        with self.assertRaisesRegex(PipelineError, "grok-4-1.*final-judge"):
+        with self.assertRaisesRegex(PipelineError, "grok-4-1"):
             check_models(self.config, self.project(names))
 
     def test_missing_image_deployment_raises(self):
