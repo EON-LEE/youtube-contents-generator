@@ -99,7 +99,7 @@ class AgentSpec:
 
 ROSTER: tuple[AgentSpec, ...] = (
     AgentSpec("showrunner", "planning", "showrunner.md", "brief", ("file_search",)),
-    AgentSpec("trend-researcher", "planning", "trend_researcher.md", "research", ("web_search",)),
+    AgentSpec("trend-researcher", "planning", "trend_researcher.md", "research", ("web_search",), "", 20000),
     AgentSpec("performance-analyst", "planning", "performance_analyst.md", "analysis", ("file_search",)),
     AgentSpec("concept-writer-a", "planning", "concept_writer.md", "concept", ("file_search",), "concept_writers"),
     AgentSpec("concept-writer-b", "planning", "concept_writer.md", "concept", ("file_search",), "concept_writers"),
@@ -111,7 +111,7 @@ ROSTER: tuple[AgentSpec, ...] = (
     AgentSpec("critic-continuity", "writing", "critic_continuity.md", "critique", (), "critics", 4000),
     AgentSpec("critic-engagement", "writing", "critic_engagement.md", "critique", ("file_search",), "critics", 4000),
     AgentSpec("critic-korean", "writing", "critic_korean.md", "critique", (), "critics", 4000),
-    AgentSpec("critic-originality", "writing", "critic_originality.md", "critique", ("web_search",), "critics", 4000),
+    AgentSpec("critic-originality", "writing", "critic_originality.md", "critique", ("web_search",), "critics", 16000),
     AgentSpec("critic-policy", "writing", "critic_policy.md", "critique", (), "critics", 4000),
     AgentSpec("arbiter", "writing", "arbiter.md", "revision_plan", (), "", 4000),
     AgentSpec("script-doctor", "writing", "script_doctor.md", "revision", ("file_search",), "writers", 16000),
@@ -119,7 +119,7 @@ ROSTER: tuple[AgentSpec, ...] = (
     AgentSpec("voice-director", "direction", "voice_director.md", "casting", (), "", 2000),
     AgentSpec("art-director", "direction", "art_director.md", "art_direction", ("file_search",), "", 4000),
     AgentSpec("art-critic", "direction", "art_critic.md", "art_review", (), "", 1500),
-    AgentSpec("packaging-agent", "packaging", "packaging_agent.md", "packaging", ("web_search",), "packagers", 4000),
+    AgentSpec("packaging-agent", "packaging", "packaging_agent.md", "packaging", ("web_search",), "packagers", 16000),
     AgentSpec("click-judge", "packaging", "click_judge.md", "click_scores", (), "", 2000),
     AgentSpec("final-judge", "packaging", "final_judge.md", "final_verdict", (), "", 3000),
     AgentSpec("retrospective", "learning", "retrospective.md", "retrospective", ("file_search",), "", 4000),

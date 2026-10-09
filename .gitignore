@@ -18,3 +18,4 @@ outputs/
 runs/
 library/
 agents-manifest.json
+infra/main.parameters.json
