@@ -95,6 +95,12 @@ def short_window(episode: dict[str, Any], short: dict[str, Any], captions: list[
     begin = offset + anchor_seconds(scene["narration"], local, short["start_anchor"])
     end = offset + anchor_seconds(scene["narration"], local, short["end_anchor"], end=True)
     length = end - begin
+    if length < SHORT_RANGE[0] and local:
+        # The agent's chosen anchors were too close together; extend into the rest of this
+        # scene's own already-generated captions (never past it) before giving up.
+        scene_end = offset + local[-1]["end"]
+        end = min(scene_end, begin + SHORT_RANGE[0])
+        length = end - begin
     if not SHORT_RANGE[0] <= length <= SHORT_RANGE[1]:
         raise PipelineError(
             f"Short in scene {scene['id']} is {length:.1f}s; Shorts segments must be {SHORT_RANGE[0]:.0f}-{SHORT_RANGE[1]:.0f}s."

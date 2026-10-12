@@ -12,8 +12,8 @@ from ..media import execute, ffmpeg_executable, wav_duration, write_json
 from ..models import PipelineError, digest
 from .render_v3 import SCENE_PAD_SECONDS, compile_shot_timeline_v3, scene_starts
 
-MIXER = "studio-mix-v1-sidechain-loudnorm-I-14-TP-1.5"
-TARGET_I, TARGET_TP, TARGET_LRA = -14.0, -1.5, 11.0
+MIXER = "studio-mix-v1-sidechain-loudnorm-I-14-TP-2.0"
+TARGET_I, TARGET_TP, TARGET_LRA = -14.0, -2.0, 11.0
 LICENSE_FIELDS = ("source", "license_id", "proof_url_or_file")
 
 
