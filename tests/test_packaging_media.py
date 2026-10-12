@@ -71,8 +71,17 @@ class MetadataTests(unittest.TestCase):
         starts = {"01": 100.0}
         short = {"scene_id": "01", "start_anchor": "민지는 문을", "end_anchor": "들어왔다", "hook": "문이 열렸다"}
         self.assertEqual(pkg.short_window(self.episode, short, long_captions(), starts), (100.0, 125.25))
+        # Anchors too close together extend into the rest of this scene's own captions
+        # instead of failing outright, as long as that scene actually has enough content.
+        self.assertEqual(
+            pkg.short_window(self.episode, {**short, "end_anchor": "문을 열었다"}, long_captions(), starts),
+            (100.0, 115.25))
+        tiny_captions = [
+            {"scene": "01", "start": 100.0, "end": 108.0, "text": "민지는 문을 열었다."},
+            {"scene": "01", "start": 108.0, "end": 112.0, "text": "바람이 차갑게 들어왔다."},
+        ]
         with self.assertRaisesRegex(PipelineError, "15-59"):
-            pkg.short_window(self.episode, {**short, "end_anchor": "문을 열었다"}, long_captions(), starts)
+            pkg.short_window(self.episode, {**short, "end_anchor": "문을 열었다"}, tiny_captions, starts)
         with self.assertRaises(PipelineError):
             pkg.short_window(self.episode, {**short, "scene_id": "09"}, long_captions(), starts)
 

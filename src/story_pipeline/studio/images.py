@@ -266,6 +266,20 @@ def _check_review(verdict: Any, key: str) -> dict[str, Any]:
             "regenerate": verdict["regenerate"], "revised_prompt": str(verdict.get("revised_prompt", "") or "")}
 
 
+def _reusable_verdict(previous_shot: dict[str, Any] | None, attempt: int, fingerprint: str) -> dict[str, Any] | None:
+    """If a prior art_loop run already reviewed and accepted this exact image (same attempt
+    number, same content-addressed fingerprint), reuse that verdict instead of paying for
+    another art-critic review. Only applies to accepted attempts: a rejected verdict is never
+    reused, since the retry loop's prompt overrides make later attempts path-dependent."""
+    if not previous_shot:
+        return None
+    for prior in previous_shot.get("attempts", []):
+        if prior.get("attempt") == attempt and prior.get("fingerprint") == fingerprint and prior.get("accepted"):
+            return {"score": prior["score"], "issues": prior.get("issues", []),
+                    "regenerate": prior["regenerate"], "revised_prompt": prior.get("revised_prompt", "")}
+    return None
+
+
 def art_loop(
     episode: dict[str, Any], art_direction: dict[str, Any], references: dict[str, Path], directory: Path, *,
     config: StudioConfig, ledger: CostLedger, client: ImageClient, review: Reviewer,
@@ -275,7 +289,18 @@ def art_loop(
 
     Accepted (or best-scoring, when the cap is hit) attempts are written as 1920x1080 frames
     ``frames/{scene}-shot-{shot}.png``; ``passed`` is False if any shot never cleared the gate.
+
+    Re-running after a later pipeline stage fails is free for already-accepted shots: image
+    generation is already content-addressed (``cached_image``), and an accepted art-critic
+    verdict for the exact same image is reused from ``art-report.json`` rather than re-reviewed.
     """
+    previous_shots: dict[str, Any] = {}
+    existing_report = directory / "art-report.json"
+    if existing_report.exists():
+        try:
+            previous_shots = json.loads(existing_report.read_text(encoding="utf-8")).get("shots", {})
+        except (OSError, ValueError):
+            previous_shots = {}
     shots = {f"{scene['id']}/{shot['id']}": (scene, shot) for scene in episode["scenes"] for shot in scene["shots"]}
     history: dict[str, list[dict[str, Any]]] = {key: [] for key in shots}
     overrides: dict[str, str | None] = {key: None for key in shots}
@@ -288,11 +313,14 @@ def art_loop(
                 episode, art_direction, scene, shot, references, directory, config=config, ledger=ledger,
                 client=client, attempt=attempt, visual_override=overrides[key], soften=soften,
             )
-            verdict = _check_review(review(Path(record["path"]).read_bytes(), {**shot, "scene_id": scene["id"]}), key)
+            reused = _reusable_verdict(previous_shots.get(key), attempt, record["fingerprint"])
+            verdict = reused or _check_review(
+                review(Path(record["path"]).read_bytes(), {**shot, "scene_id": scene["id"]}), key)
             accepted = not verdict["regenerate"] and verdict["score"] >= config.thresholds.art
             history[key].append({
                 "attempt": attempt, "path": record["path"], "prompt": record["prompt"], "cached": record["cached"],
-                "content_filter_refusals": record["content_filter_refusals"], **verdict, "accepted": accepted,
+                "fingerprint": record["fingerprint"], "content_filter_refusals": record["content_filter_refusals"],
+                **verdict, "accepted": accepted,
             })
             if not accepted:
                 failed.append(key)

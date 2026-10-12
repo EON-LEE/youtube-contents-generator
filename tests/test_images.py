@@ -144,6 +144,29 @@ class ImageTests(unittest.TestCase):
         self.assertEqual(sorted(report["failed_shots"]), ["03/01", "03/02"])
         self.assertEqual(len(report["shots"]["03/01"]["attempts"]), 3)
 
+    def test_art_loop_resume_reuses_accepted_reviews_without_recalling(self):
+        """A later pipeline stage (speech, mix, ...) can fail after art_loop succeeds; a
+        resumed run must not re-pay for art-critic review of shots already accepted for the
+        exact same generated image."""
+        client = FakeImageClient()
+        refs = self.references(client)
+        first = images.art_loop(self.episode, ART, refs, self.root, config=self.config, ledger=self.ledger,
+                                client=client, review=lambda data, shot: {"score": 9, "issues": [],
+                                                                          "regenerate": False, "revised_prompt": ""})
+        self.assertTrue(first["passed"])
+
+        def review_must_not_be_called(data, shot):
+            raise AssertionError("art-critic should not be re-invoked for an already-accepted shot")
+
+        calls_before = len(client.calls)
+        second = images.art_loop(self.episode, ART, refs, self.root, config=self.config, ledger=self.ledger,
+                                 client=client, review=review_must_not_be_called)
+        self.assertTrue(second["passed"])
+        self.assertEqual(len(client.calls), calls_before)  # cached_image also skips regeneration
+        for key in first["shots"]:
+            self.assertEqual(second["shots"][key]["accepted"], first["shots"][key]["accepted"])
+            self.assertEqual(second["shots"][key]["chosen_attempt"], first["shots"][key]["chosen_attempt"])
+
 
 class FoundryClientTests(unittest.TestCase):
     def test_openai_client_calls_and_refusal_mapping(self):
