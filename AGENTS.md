@@ -21,13 +21,14 @@ The two paths are not connected: the simulator's `produce` stage never feeds
    25 Foundry prompt agents on mixed model families run bounded plan/write/critique/revise
    loops, Azure Speech + Foundry images + FFmpeg produce the episode, a final gate decides,
    approved episodes go to YouTube as **private** videos, and retrospectives grow a playbook.
-   Code is complete and tested offline; nothing is deployed yet (see `infra/README.md`).
+   Foundry agents and Azure production have been exercised for a real episode.
+   Do not assume the full scheduled/upload/learning stack is operating; see README.md.
 
 ## Key Files
 | File | Description |
 |------|-------------|
 | `README.md` | User guide for both paths, cost evidence, scope boundaries |
-| `MIGRATION.md` | Machine handoff, release-archive restore, planned Azure phase |
+| `MIGRATION.md` | Machine handoff and historical release-archive recovery |
 | `pyproject.toml` | Package metadata; extras `media` (edge-tts, Pillow, imageio-ffmpeg) and `evaluation` (faster-whisper) |
 | `requirements-windows-py312.txt` | Constraints file from the working Windows/Python 3.12 environment |
 | `studio.toml` | Studio config: per-agent model deployments (placeholders), prices, loop caps, thresholds, USD 10/episode budget |
@@ -52,7 +53,7 @@ The two paths are not connected: the simulator's `produce` stage never feeds
 - Real rendering resolves a Korean font via `fonts.korean_font()` (`STORY_FONT`, Malgun Gothic, Noto Sans CJK, Nanum).
 - `produce-local --allow-external-tts` sends narration to Microsoft's Edge service. Do not run it without the user's permission.
 - Never add a silent fallback (Edge, fixture, fake output) when a real provider fails; the codebase fails explicitly by design.
-- Do not commit `outputs/`; finished videos live in the GitHub release `local-video-handoff-2026-10-02`.
+- Do not commit `outputs/`. The `local-video-handoff-2026-10-02` release contains only historical samples; newer outputs need separate backup.
 - Git/PR accounts: the app runs as `eonlee_microsoft` (read-only on this repo). Push works through `~/.gitconfig-eonlee-auth`; create and merge PRs with `$env:GH_TOKEN = gh auth token --user EON-LEE`.
 
 ### Testing Requirements

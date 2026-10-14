@@ -2,7 +2,7 @@
 
 **Moving to another machine:** see [MIGRATION.md](MIGRATION.md) for setup,
 the public release containing both completed videos and production artifacts,
-checksum verification, and the remaining Azure integration work.
+checksum verification, and the distinction between archived and current outputs.
 
 Three paths are available:
 
@@ -11,19 +11,39 @@ Three paths are available:
 - **Actual local production:** original Korean episode JSON → two real narration
   voices → original locally drawn illustrations → burned-in subtitles and a
   local MP4 → technical and optional local speech-recognition evaluation.
-- **Autonomous studio (code complete, not yet deployed):** a self-improving team of
+- **Autonomous studio:** a self-improving team of
   Foundry agents produces episodes end to end and uploads approved ones to YouTube
   as **private** videos. See [Autonomous studio](#autonomous-studio).
 
 The local production path has no YouTube connection, authentication or upload.
-The actual production path uses Microsoft Edge online speech through `edge-tts`
+The `produce-local` path uses Microsoft Edge online speech through `edge-tts`
 with explicit permission. It is **not an authenticated Azure Speech integration**.
-No Azure credentials were available for the sample; no cloud resources were
-created. Unkeyed Edge access is not a production SLA or commercial-use clearance.
+The archived `changed-lock` samples used this Edge path, not Azure.
+Unkeyed Edge access is not a production SLA or commercial-use clearance.
 
-The business target is **KRW 1,000,000 monthly pretax cash profit after actual
-service/operating costs, excluding the owner's labor cost**. This prototype does
-not establish audience demand, monetization eligibility, or profitability.
+The current goal is **first actual revenue from Korean stories for elderly viewers**.
+Production results do not establish audience demand, monetization eligibility,
+or profitability.
+
+## Current production status (2026-10-14)
+
+Foundry prompt agents and Azure-backed production have been exercised for a real
+episode. This does not establish that the entire scheduled hosted-agent,
+render/upload and learning stack is deployed or operating unattended.
+Deployment templates and prerequisites are in [infra/README.md](infra/README.md).
+
+The locally retained senior pilot is in `outputs\senior-pilot-2026-10-12\`:
+`manuscript.txt`, a 25-minute 10-second 1080p main video, two vertical Shorts
+(36 and 35 seconds), captions, thumbnail and `production.json`. It reuses artwork,
+uses Azure Speech narration without test music/SFX, enlarges captions, labels
+speakers, and retains zoom/pan with reduced crop-rounding jitter.
+Technical checks passed; target-age listening, audience retention and revenue
+remain unverified. The pilot has not been uploaded.
+
+These outputs are ignored local files, **not included in a clone or the older
+release archive**. Preserve them separately before migrating machines.
+The incremental Speech ledger estimate is USD 0.159930 using configured prices,
+not an Azure invoice or a full-episode cost.
 
 ## Revised edition: narrative-directed cuts
 
@@ -98,7 +118,8 @@ $env:PYTHONIOENCODING = "utf-8"
 `--allow-external-tts` permits sending this episode's narration to the Edge speech
 service. It does not authorize uploads to video platforms. The bundled FFmpeg
 comes from `imageio-ffmpeg`; nothing is installed system-wide. The current subtitle
-renderer requires Windows Malgun Gothic at `C:\Windows\Fonts\malgun.ttf`. The font
+renderer resolves `STORY_FONT`/`STORY_FONT_BOLD`, Malgun Gothic, Noto Sans CJK
+or Nanum Gothic. The font
 is copied only for local rendering, then removed from the temporary fonts folder.
 
 If package downloads fail because of a TLS transport problem, do not disable
@@ -182,10 +203,8 @@ integrity-checked and reused. Revisions invalidate the selected stage and its
 successors; earlier artifacts and spent virtual costs remain in the history.
 Retries are bounded, including across process restarts.
 
-Python + SQLite is the initial execution layer. Hermes could later provide
-planning/memory; OpenClaw could provide messaging; n8n could provide an operations
-UI. None is installed, required, or connected by this prototype. Role names do
-not represent independently running live model agents yet.
+Python + SQLite is the simulator's execution layer. Its fixture roles are not
+live model agents; the separate studio path uses Foundry agents.
 
 ### Run the simulator on Windows
 
@@ -288,13 +307,9 @@ Compute, storage, transmission, licensing, taxes, exchange rates, model selectio
 and actual retry rates remain to be priced. USD usage is not implicitly converted
 to the KRW business scenarios.
 
-At a **hypothetical** KRW 170,000 monthly cash cost, the KRW 1,000,000 profit
-target needs KRW 1,170,000 creator ad revenue. Hypothetical ad-only creator receipts
-of KRW 1,000 / 3,000 / 5,000 per 1,000 total views require respectively
-1,170,000 / 390,000 / 234,000 monthly catalog views. These rates are not measured
-genre RPM. They are after platform revenue sharing, so do not subtract the
-platform share again. Before YPP ad-revenue eligibility, creator ad revenue is
-zero. Labor time is an operational measure, not a deducted cash cost.
+No measured genre RPM or revenue forecast is available. Creator RPM is after
+platform revenue sharing; do not subtract the platform share again.
+Before YPP ad-revenue eligibility, creator ad revenue is zero.
 
 ## Tests
 
@@ -311,8 +326,10 @@ cash-only economics and rejection of live providers.
 ## Autonomous studio
 
 `src/story_pipeline/studio/` turns the one-shot local path into a team that
-improves itself. Nothing is deployed yet; Azure resources, model access and the
-YouTube OAuth grant are prerequisites (see [infra/README.md](infra/README.md)).
+improves itself. Azure resources and model access are required; uploading also
+requires a YouTube OAuth grant and explicit authorization
+(see [infra/README.md](infra/README.md)). See the current production status above
+for what has actually been exercised.
 
 **Inside one episode (bounded loops, never one-shot):**
 

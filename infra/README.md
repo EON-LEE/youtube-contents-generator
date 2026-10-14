@@ -1,7 +1,11 @@
 # Azure infrastructure
 
-Managed services only, keyless (Microsoft Entra ID) everywhere. Nothing in this folder
-has been deployed by the repository; run it yourself after reviewing the what-if.
+Managed-service deployment templates with Microsoft Entra ID authentication.
+Foundry agents and Azure production have been exercised, but this is not evidence
+that every resource or scheduled workflow in these templates is deployed.
+See the [current production status](../README.md#current-production-status-2026-10-14).
+Review the target environment and what-if before deploying; do not redeploy just
+to play existing local videos.
 
 ```
 Logic Apps Standard ──(MI, https://ai.azure.com)──► Foundry hosted agent "story-studio"

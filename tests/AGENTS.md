@@ -4,7 +4,7 @@
 **Generated:** 2026-10-08 · **Updated:** 2026-10-08
 
 ## Purpose
-`unittest` suite (60 tests). Runs fully offline; no TTS, model download, or upload.
+`unittest` suite. Runs fully offline; no TTS, model download, or upload.
 
 ## Key Files
 | File | Description |

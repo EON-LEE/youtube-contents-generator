@@ -1,24 +1,21 @@
 # Development handoff and artifact recovery
 
-## What is actually implemented
+## Scope of this recovery guide
 
-The repository contains the offline role/workflow simulator and a working local
-production pipeline. The latter consumes an episode JSON, synthesizes Korean
-audio using **Microsoft Edge speech through edge-tts**, renders original Pillow
-illustrations, aligns subtitles, and produces a local MP4 using FFmpeg.
+This guide restores the **historical 2026-10-02 Edge/Pillow samples**, not the
+current Azure-produced pilot. Current capabilities and production status are
+maintained in [README.md](README.md#current-production-status-2026-10-14);
+deployment prerequisites are in [infra/README.md](infra/README.md).
 
 - Original edition: `episodes\changed-lock.json`, 1,280.44 seconds.
 - Revised edition: `episodes\changed-lock-v2.json`, 1,296.50 seconds, 56 directed
   shots, 336 captions, zero captions shorter than one second.
 - Both videos are 1280 x 720 at 24 fps, H.264/AAC.
-- Research, writing, editing and art direction were performed in the agent
-  session. The runtime does **not** yet call a live LLM to generate new episode
-  scripts automatically.
-- **Azure is required for the next development phase but is not implemented.**
-  No Azure account, endpoint, key or deployment has been connected or provisioned.
-- **No YouTube integration or upload is authorized or implemented.**
-- Goal: KRW 1,000,000 monthly pretax cash profit after actual operating costs,
-  excluding owner labor. Audience response and profit are not verified.
+
+Newer files in `outputs\senior-pilot-2026-10-12\` and `.story-pipeline\` are
+local, ignored artifacts. They are not in this archive or a Git clone.
+Back them up separately, with their provenance and checksums, before removing
+or migrating the existing workspace. Never include credentials in an archive.
 
 ## Release assets
 
@@ -47,7 +44,7 @@ Machine-specific workspace paths in textual artifacts are replaced with portable
 relative paths or a historical session-path marker. These transformations change
 text artifact hashes, not the MP4/audio/image bytes. The migration manifest is the
 integrity record for this archive. Historical plan decisions are superseded by
-the current scope above; do not treat old spending proposals as authorization.
+the current README; do not treat old spending proposals as authorization.
 
 Excluded deliberately: `.venv`, downloaded wheels, Whisper model cache, scratch
 browser captures/downloads, local simulator DB, font binaries and credentials.
@@ -56,10 +53,10 @@ dependencies can be downloaded afresh; test state can be recreated.
 
 ## Clone and set up
 
-Recommended initial migration target: Windows with Python 3.12 and Malgun Gothic.
-The simulator is portable, but the current real subtitle renderer expects
-`C:\Windows\Fonts\malgun.ttf`. A Linux host needs an explicit font configuration
-change before real rendering; do not assume it works unchanged.
+Windows with Python 3.12 and Malgun Gothic matches the archived samples.
+The renderer also supports Noto Sans CJK and Nanum Gothic, or explicit
+`STORY_FONT`/`STORY_FONT_BOLD` paths. Install a supported Korean font on the
+target machine before rendering.
 
 ```powershell
 gh repo clone EON-LEE/youtube-contents-generator
@@ -76,8 +73,9 @@ $env:PYTHONIOENCODING = "utf-8"
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-For playback only, Python plus the release archive is sufficient; no TTS,
-recognition model or package installation is needed.
+For direct MP4 playback, the archive and a compatible media player are sufficient.
+Python is needed only for the optional local HTTP player below; no TTS,
+recognition model or package installation is needed for playback.
 
 The constraints file records the environment used for these results, including
 transitive media/evaluation dependencies. It is not a security audit, hash lock,
@@ -145,29 +143,14 @@ can be reused; do not edit cached artifacts manually and claim they are still
 verified. The short ASR excerpts are cached as audio, but the recognition model
 must be downloaded separately if rerunning ASR evaluation.
 
-## Next development: Azure, not another Edge substitute
+## Current studio migration
 
-The user's latest decision is to use Azure for the generation stages:
+Use the README and infrastructure guide rather than the archive's historical
+development plans. Install the extras required by the intended studio stage and
+verify authorized resources, model access and identity on the destination.
+Do not copy credentials or assume the old machine's login remains available.
+Missing credentials or failed providers must stop explicitly, never fall back
+to Edge, fixtures or fake output. Uploads require separate authorization.
 
-1. Select existing authorized Azure resources, region, model deployment names,
-   authentication method and a per-run cash limit. Resource availability and
-   account permissions remain unknown. Do not copy credentials from this machine.
-2. Add live Azure OpenAI structured-output calls for topic planning, storyline,
-   scene writing and critique. A live research role needs sourced retrieval;
-   asking a model to "research" does not supply current evidence.
-3. Add Azure Speech synthesis and boundary events. Replace the hardwired Edge
-   path through an explicit provider boundary and provider-specific cache keys.
-4. Add Azure image generation/editing with character references and per-shot
-   direction. Keep subtitles and final compositing local.
-5. Preserve bounded revision loops, usage accounting, fail/resume behavior,
-   artifact provenance and quality gates. The simulator's virtual budget is
-   **not** a real billing control.
-6. Missing credentials, quota errors, refusals, or unavailable deployments must
-   stop explicitly. **Never silently fall back to Edge, fixtures, or fake output.**
-7. Run a small, separately authorized Azure smoke test, then one full local
-   episode and a before/after quality/cost comparison. No YouTube connection.
-
-Existing quality checks cover technical integrity, not target-audience
-satisfaction. The illustrations remain stylized, and ASR character differences
-are not emotion or acting scores. A switch to Azure alone does not establish
-viral potential, monetization eligibility, or monthly profit.
+Technical integrity checks do not establish target-audience satisfaction,
+monetization eligibility or profit.
