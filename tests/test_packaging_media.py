@@ -70,12 +70,10 @@ class MetadataTests(unittest.TestCase):
     def test_short_window_bounds(self):
         starts = {"01": 100.0}
         short = {"scene_id": "01", "start_anchor": "민지는 문을", "end_anchor": "들어왔다", "hook": "문이 열렸다"}
-        self.assertEqual(pkg.short_window(self.episode, short, long_captions(), starts), (100.0, 125.25))
-        # Anchors too close together extend into the rest of this scene's own captions
-        # instead of failing outright, as long as that scene actually has enough content.
+        self.assertEqual(pkg.short_window(self.episode, short, long_captions(), starts), (100.0, 125.0))
         self.assertEqual(
             pkg.short_window(self.episode, {**short, "end_anchor": "문을 열었다"}, long_captions(), starts),
-            (100.0, 115.25))
+            (100.0, 125.0))
         tiny_captions = [
             {"scene": "01", "start": 100.0, "end": 108.0, "text": "민지는 문을 열었다."},
             {"scene": "01", "start": 108.0, "end": 112.0, "text": "바람이 차갑게 들어왔다."},
@@ -85,8 +83,33 @@ class MetadataTests(unittest.TestCase):
         with self.assertRaises(PipelineError):
             pkg.short_window(self.episode, {**short, "scene_id": "09"}, long_captions(), starts)
 
+    def test_short_padding_does_not_include_next_sentence_or_exceed_maximum(self):
+        short = {"scene_id": "01", "start_anchor": "민지는 문을", "end_anchor": "문을 열었다"}
+        captions = long_captions()
+        captions[0]["end"] = 159.0
+        captions[1]["start"], captions[1]["end"] = 159.0, 175.0
+        self.assertEqual(pkg.short_window(self.episode, short, captions, {"01": 100.0}), (100.0, 159.0))
+        captions[0]["end"] = 120.0
+        captions[1]["start"] = 120.0
+        self.assertEqual(pkg.short_window(self.episode, short, captions, {"01": 100.0}), (100.0, 120.0))
+
 
 class CaptionFileTests(unittest.TestCase):
+    def test_clip_discards_subframe_boundary_slivers_and_preserves_readable_cues(self):
+        captions = [
+            {"start": 0.0, "end": 10.0003, "text": "앞 문장"},
+            {"start": 10.0003, "end": 20.0001, "text": "남길 문장"},
+            {"start": 20.0001, "end": 30.0, "text": "뒤 문장"},
+        ]
+        clipped = pkg.clip_captions(captions, 10.0, 20.0002)
+        self.assertEqual(len(clipped), 1)
+        self.assertEqual(clipped[0]["text"], "남길 문장")
+        self.assertAlmostEqual(clipped[0]["start"], 0.0003)
+        self.assertAlmostEqual(clipped[0]["end"], 10.0001)
+        for begin, end in ((-1, 10), (10, 10), (11, 10)):
+            with self.subTest(begin=begin, end=end), self.assertRaises(PipelineError):
+                pkg.clip_captions(captions, begin, end)
+
     def test_srt_and_vtt(self):
         root = Path(__file__).parent / f".captions-{uuid4().hex}"
         root.mkdir()
@@ -138,7 +161,7 @@ class PackagingMediaTests(unittest.TestCase):
                                     directory=self.root / "shorts")
         video = Path(results[0]["file"])
         ffmpeg = ffmpeg_executable()
-        self.assertAlmostEqual(probe_duration(ffmpeg, video), 25.25, delta=0.15)
+        self.assertAlmostEqual(probe_duration(ffmpeg, video), 25.0, delta=0.15)
         probe = subprocess.run([ffmpeg, "-hide_banner", "-i", str(video)], capture_output=True, text=True,
                                encoding="utf-8", errors="replace").stderr
         self.assertIn("1080x1920", probe)

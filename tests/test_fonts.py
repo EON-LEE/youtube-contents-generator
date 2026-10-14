@@ -54,6 +54,17 @@ class FontTests(unittest.TestCase):
         self.assertIn("Style: Narration,Malgun Gothic,40", (self.root / "a.ass").read_text(encoding="utf-8-sig"))
         self.assertIn("Style: Notice,Noto Sans CJK KR,18", (self.root / "b.ass").read_text(encoding="utf-8-sig"))
 
+    def test_large_captions_and_escaped_speaker_label(self):
+        write_ass(self.root / "senior.ass", [{"start": 0, "end": 2, "text": "안녕"}],
+                  font_size=48, speaker="김정식 {이야기}")
+        text = (self.root / "senior.ass").read_text(encoding="utf-8-sig")
+        self.assertIn("Style: Narration,Malgun Gothic,48", text)
+        self.assertIn("Style: Speaker,Malgun Gothic,24", text)
+        self.assertIn("Speaker,,0,0,0,,김정식 ｛이야기｝", text)
+        for size in (0, 65, 40.5, True):
+            with self.subTest(size=size), self.assertRaisesRegex(PipelineError, "Caption font size"):
+                write_ass(self.root / "invalid.ass", [], font_size=size)
+
 
 if __name__ == "__main__":
     unittest.main()

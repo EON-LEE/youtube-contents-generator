@@ -358,6 +358,18 @@ Uploads happen only when `STUDIO_UPLOAD=private`. Background music and effects m
 come from a `library/` with license evidence per file (`library.json`); files without
 commercial-use evidence are rejected.
 
+For an older-audience edition, `render_episode_v3(..., caption_font_size=48,
+show_speaker=True)` increases burned-in caption size and labels each scene's
+narrator; defaults retain the existing 40-point captions without speaker labels.
+Ken Burns zooms and pans use enlarged RGB coordinates and supersampled output
+to reduce crop-rounding jitter without removing the intended movement.
+The renderer version invalidates scene caches created with the previous motion filter.
+Shorts shorter than 15 seconds extend to an existing caption boundary, not an
+arbitrary point inside a caption. Trailing padding never includes the next cue,
+extends beyond the scene's captions, or exceeds the 59-second maximum.
+Caption clipping drops boundary slivers shorter than one video frame; technical
+checks reject zero-length or reversed subtitle intervals.
+
 ## Scope boundaries
 
 Actual **local** production and evaluation are now authorized and implemented

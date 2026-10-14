@@ -293,7 +293,12 @@ def ass_text(text: str) -> str:
     return text.replace("\\", "＼").replace("{", "｛").replace("}", "｝").replace("\n", r"\N")
 
 
-def write_ass(path: Path, captions: list[dict[str, Any]], *, font_name: str = "Malgun Gothic") -> None:
+def write_ass(
+    path: Path, captions: list[dict[str, Any]], *, font_name: str = "Malgun Gothic",
+    font_size: int = 40, speaker: str = "",
+) -> None:
+    if type(font_size) is not int or not 12 <= font_size <= 64:
+        raise PipelineError("Caption font size must be an integer between 12 and 64.")
     header = """[Script Info]
 ScriptType: v4.00+
 PlayResX: 1280
@@ -303,12 +308,18 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Narration,__FONT__,40,&H00F3F6F8,&H00F3F6F8,&H001B2330,&H001B2330,0,0,0,0,100,100,0,0,1,2,0,2,70,70,28,1
+Style: Narration,__FONT__,__SIZE__,&H00F3F6F8,&H00F3F6F8,&H001B2330,&H001B2330,0,0,0,0,100,100,0,0,1,2,0,2,70,70,28,1
 Style: Notice,__FONT__,18,&H00A7BEC8,&H00A7BEC8,&H001B2330,&H001B2330,0,0,0,0,100,100,0,0,1,0,0,7,24,24,572,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-""".replace("__FONT__", font_name.replace(",", " "))
+""".replace("__FONT__", font_name.replace(",", " ")).replace("__SIZE__", str(font_size))
+    if speaker:
+        header = header.replace(
+            "\n[Events]",
+            f"\nStyle: Speaker,{font_name.replace(',', ' ')},24,&H00FFFFFF,&H00FFFFFF,"
+            "&H001B2330,&H001B2330,1,0,0,0,100,100,0,0,1,2,0,9,24,24,24,1\n\n[Events]",
+        )
     events = [
         f"Dialogue: 0,{timestamp(cue['start'], ass=True)},{timestamp(cue['end'], ass=True)},Narration,,0,0,0,,{ass_text(cue['text'])}"
         for cue in captions
@@ -318,6 +329,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             0,
             f"Dialogue: 1,0:00:00.00,{timestamp(captions[-1]['end'] + 0.35, ass=True)},Notice,,0,0,0,,창작 오디오드라마 · AI 음성",
         )
+        if speaker:
+            events.append(
+                f"Dialogue: 1,0:00:00.00,{timestamp(captions[-1]['end'] + 0.35, ass=True)},"
+                f"Speaker,,0,0,0,,{ass_text(speaker)}",
+            )
     path.write_text(header + "\n".join(events) + "\n", encoding="utf-8-sig")
 
 

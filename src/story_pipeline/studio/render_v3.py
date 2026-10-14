@@ -19,7 +19,7 @@ from .episode_v3 import validate_shots
 
 SCENE_PAD_SECONDS = 0.35
 RESOLUTIONS = {(1280, 720), (1920, 1080)}
-RENDERER = "studio-v3-kenburns-24fps-x264-veryfast-crf20"
+RENDERER = "studio-v3-smooth-rgb-kenburns-24fps-x264-veryfast-crf20"
 TARGET_LUFS = -14.0
 
 
@@ -112,6 +112,16 @@ def _motion(index: int, frames: int) -> str:
     ][index % 4]
 
 
+def _shot_filter(index: int, frames: int, size: tuple[int, int]) -> str:
+    width, height = size
+    # RGB avoids chroma-grid snapping; 4x coordinates reduce integer crop steps to subpixels.
+    return (
+        f"scale={width * 4}:{height * 4},format=gbrp,"
+        f"zoompan={_motion(index, frames)}:d={frames}:s={width * 2}x{height * 2}:fps={FRAME_RATE},"
+        f"scale={width}:{height}:flags=lanczos,setsar=1,setpts=PTS-STARTPTS"
+    )
+
+
 def _render_scene(
     ffmpeg: str, scene_id: str, shots: list[dict[str, Any]], frames_dir: Path, work: Path,
     size: tuple[int, int], preset: str,
@@ -133,12 +143,10 @@ def _render_scene(
         if record.get("fingerprint") == key and record.get("sha256") == hashlib.sha256(video.read_bytes()).hexdigest():
             return video
     inputs, filters = [], []
-    source = f"{width * 3 // 2}:{height * 3 // 2}"
     for index, (image, shot) in enumerate(zip(images, shots, strict=True)):
         inputs.extend(["-i", str(image)])
         filters.append(
-            f"[{index}:v]scale={source},zoompan={_motion(index, shot['global_frames'])}:"
-            f"d={shot['global_frames']}:s={width}x{height}:fps={FRAME_RATE},setsar=1,setpts=PTS-STARTPTS[v{index}]"
+            f"[{index}:v]{_shot_filter(index, shot['global_frames'], size)}[v{index}]"
         )
     joins = "".join(f"[v{index}]" for index in range(len(images)))
     filters.append(f"{joins}concat=n={len(images)}:v=1:a=0,subtitles={scene_id}.ass:fontsdir=fonts,format=yuv420p[vout]")
@@ -159,6 +167,7 @@ def render_episode_v3(
     episode: dict[str, Any], speech: list[dict[str, Any]], audio: Path, frames_dir: Path, output: Path, *,
     resolution: tuple[int, int] = (1920, 1080), preset: str = "veryfast",
     duration_range: tuple[float, float] = (1200.0, 1800.0),
+    caption_font_size: int = 40, show_speaker: bool = False,
 ) -> dict[str, Any]:
     if tuple(resolution) not in RESOLUTIONS:
         raise PipelineError(f"Resolution must be one of {sorted(RESOLUTIONS)}.")
@@ -182,7 +191,9 @@ def render_episode_v3(
         offset = shots[0]["global_frame"] / FRAME_RATE
         local = [{**cue, "start": max(0.0, cue["start"] - offset), "end": cue["end"] - offset}
                  for cue in plan["captions"] if cue["scene"] == scene["id"]]
-        write_ass(work / f"{scene['id']}.ass", local, font_name=family)
+        speaker = next(c["name"] for c in episode["characters"] if c["id"] == scene["pov"]) if show_speaker else ""
+        write_ass(work / f"{scene['id']}.ass", local, font_name=family,
+                  font_size=caption_font_size, speaker=speaker)
         segments.append(_render_scene(ffmpeg, scene["id"], shots, frames_dir.resolve(), work, tuple(resolution), preset))
     (work / "concat.txt").write_text("\n".join(f"file '{p.name}'" for p in segments) + "\n", encoding="utf-8")
     execute([ffmpeg, "-y", "-v", "warning", "-f", "concat", "-safe", "0", "-i", "concat.txt", "-c", "copy",
@@ -254,6 +265,7 @@ def technical_checks(
     integrated, peak = float(loudness["input_i"]), float(loudness["input_tp"])
     overlaps = [i for i in range(1, len(captions)) if captions[i]["start"] < captions[i - 1]["end"] - 0.02]
     outside = [i for i, cue in enumerate(captions) if cue["start"] < 0 or cue["end"] > duration + 0.1]
+    invalid_durations = [i for i, cue in enumerate(captions) if cue["end"] <= cue["start"]]
     checks = {
         "stream_format_pass": streams_ok and (width, height) == tuple(resolution)
                               and abs(float(rate.group(1)) - FRAME_RATE) < 0.01,
@@ -261,7 +273,7 @@ def technical_checks(
         "target_duration_pass": duration_range[0] <= duration <= duration_range[1],
         "loudness_pass": abs(integrated - TARGET_LUFS) <= 1.5,
         "true_peak_pass": peak <= -1.0,
-        "subtitle_timing_pass": not overlaps and not outside,
+        "subtitle_timing_pass": not overlaps and not outside and not invalid_durations,
     }
     result = {
         "simulated": False, "file": str(video), "video_sha256": hashlib.sha256(video.read_bytes()).hexdigest(),
@@ -269,6 +281,7 @@ def technical_checks(
         "video_width": width, "video_height": height, "measured_loudness_lufs": integrated,
         "measured_true_peak_dbtp": peak, "target_loudness_lufs": TARGET_LUFS,
         "subtitle_count": len(captions), "subtitle_overlaps": overlaps, "subtitle_out_of_bounds": outside,
+        "subtitle_invalid_durations": invalid_durations,
         **checks, "technical_pass": all(checks.values()),
         "limitations": ["Technical checks do not judge story quality, acting, or audience retention."],
     }

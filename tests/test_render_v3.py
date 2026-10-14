@@ -60,6 +60,39 @@ class TimelineTests(unittest.TestCase):
 
 
 @unittest.skipUnless(MEDIA, "Media extra is needed for the render test.")
+class MotionTests(unittest.TestCase):
+    def test_zoom_and_pan_do_not_snap_to_whole_pixel_steps(self):
+        from story_pipeline.media import ffmpeg_executable
+        width, height, frames = 320, 180, 96
+        for mode in range(4):
+            with self.subTest(mode=mode):
+                data = subprocess.run(
+                    [ffmpeg_executable(), "-v", "error", "-f", "lavfi", "-i",
+                     f"color=black:s={width}x{height},drawbox=x=230:y=115:w=12:h=12:color=white:t=fill",
+                     "-vf", render_v3._shot_filter(mode, frames, (width, height)) + ",format=gray",
+                     "-frames:v", str(frames), "-f", "rawvideo", "-"],
+                    capture_output=True, check=True, timeout=60,
+                ).stdout
+                self.assertEqual(len(data), width * height * frames)
+                centers = []
+                for frame in range(frames):
+                    pixels = data[frame * width * height:(frame + 1) * width * height]
+                    weight = sum(pixels)
+                    centers.append((
+                        sum((index % width) * value for index, value in enumerate(pixels) if value) / weight,
+                        sum(row * sum(pixels[row * width:(row + 1) * width])
+                            for row in range(height)) / weight,
+                    ))
+                for axis, limit in ((0, 0.4 if mode < 2 else 0.25), (1, 0.2)):
+                    acceleration = max(
+                        abs(centers[i + 1][axis] - 2 * centers[i][axis] + centers[i - 1][axis])
+                        for i in range(1, frames - 1)
+                    )
+                    self.assertLess(acceleration, limit)
+                self.assertGreater(abs(centers[-1][0] - centers[0][0]), 3)
+
+
+@unittest.skipUnless(MEDIA, "Media extra is needed for the render test.")
 class RenderTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -75,7 +108,8 @@ class RenderTests(unittest.TestCase):
         cls.frames = make_frames(cls.root / "frames", cls.episode)
         cls.result = render_v3.render_episode_v3(
             cls.episode, cls.speech, Path(cls.mix["file"]), cls.frames, cls.root / "out",
-            resolution=(1280, 720), preset="ultrafast", duration_range=(10, 60))
+            resolution=(1280, 720), preset="ultrafast", duration_range=(10, 60),
+            caption_font_size=48, show_speaker=True)
 
     @classmethod
     def tearDownClass(cls):
@@ -101,6 +135,13 @@ class RenderTests(unittest.TestCase):
         self.assertTrue(Path(timeline[0]["image"]).is_file())
         self.assertTrue((self.root / "out" / "episode.ko.srt").is_file())
 
+    def test_accessible_captions_and_scene_speaker_are_rendered(self):
+        ass = (self.root / "out" / "render" / "01.ass").read_text(encoding="utf-8-sig")
+        self.assertIn(",48,&H00F3F6F8", ass)
+        speaker = next(c["name"] for c in self.episode["characters"]
+                       if c["id"] == self.episode["scenes"][0]["pov"])
+        self.assertIn(f"Speaker,,0,0,0,,{speaker}", ass)
+
     def test_duration_outside_target_fails_gate_without_raising(self):
         from story_pipeline.media import ffmpeg_executable
         captions = json.loads((self.root / "out" / "captions.json").read_text(encoding="utf-8"))
@@ -109,6 +150,18 @@ class RenderTests(unittest.TestCase):
         result = render_v3.technical_checks(ffmpeg_executable(), self.root / "out" / "episode.mp4", captions,
                                             check, resolution=(1280, 720))
         self.assertFalse(result["target_duration_pass"])
+        self.assertFalse(result["technical_pass"])
+
+    def test_zero_duration_caption_fails_technical_gate(self):
+        from story_pipeline.media import ffmpeg_executable
+        check = self.root / "invalid-captions"
+        check.mkdir()
+        result = render_v3.technical_checks(
+            ffmpeg_executable(), self.root / "out" / "episode.mp4",
+            [{"start": 1.0, "end": 1.0, "text": "안녕"}], check,
+            resolution=(1280, 720), duration_range=(10, 60))
+        self.assertEqual(result["subtitle_invalid_durations"], [0])
+        self.assertFalse(result["subtitle_timing_pass"])
         self.assertFalse(result["technical_pass"])
 
     def test_rejects_unsupported_resolution_and_mismatched_audio(self):

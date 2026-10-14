@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from ..fonts import font_family, korean_font
-from ..media import ass_text, execute, ffmpeg_executable, timestamp, write_json, write_srt
+from ..media import FRAME_RATE, ass_text, execute, ffmpeg_executable, timestamp, write_json, write_srt
 from ..models import PipelineError
 from .render_v3 import anchor_seconds
 
@@ -96,16 +96,21 @@ def short_window(episode: dict[str, Any], short: dict[str, Any], captions: list[
     end = offset + anchor_seconds(scene["narration"], local, short["end_anchor"], end=True)
     length = end - begin
     if length < SHORT_RANGE[0] and local:
-        # The agent's chosen anchors were too close together; extend into the rest of this
-        # scene's own already-generated captions (never past it) before giving up.
-        scene_end = offset + local[-1]["end"]
-        end = min(scene_end, begin + SHORT_RANGE[0])
+        endings = [offset + cue["end"] for cue in local
+                   if SHORT_RANGE[0] <= offset + cue["end"] - begin <= SHORT_RANGE[1]]
+        if endings:
+            end = endings[0]
         length = end - begin
     if not SHORT_RANGE[0] <= length <= SHORT_RANGE[1]:
         raise PipelineError(
             f"Short in scene {scene['id']} is {length:.1f}s; Shorts segments must be {SHORT_RANGE[0]:.0f}-{SHORT_RANGE[1]:.0f}s."
         )
-    return round(begin, 3), round(end + 0.25, 3)
+    next_start = min(
+        (offset + cue["start"] for cue in local if offset + cue["start"] >= end - 0.001),
+        default=offset + local[-1]["end"],
+    )
+    padded_end = min(end + 0.25, next_start, offset + local[-1]["end"], begin + SHORT_RANGE[1])
+    return round(begin, 3), round(max(end, padded_end), 3)
 
 
 def _short_ass(path: Path, captions: list[dict[str, Any]], hook: str, duration: float, font_name: str) -> None:
@@ -134,6 +139,18 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     path.write_text(header + "\n".join(events) + "\n", encoding="utf-8-sig")
 
 
+def clip_captions(captions: list[dict[str, Any]], begin: float, end: float) -> list[dict[str, Any]]:
+    if begin < 0 or end <= begin:
+        raise PipelineError("Caption clip must have a nonnegative start and a later end.")
+    result = []
+    for cue in captions:
+        low, high = max(begin, cue["start"]), min(end, cue["end"])
+        if high - low < 1 / FRAME_RATE:
+            continue
+        result.append({**cue, "start": round(low - begin, 4), "end": round(high - begin, 4)})
+    return result
+
+
 def render_short(
     episode: dict[str, Any], short: dict[str, Any], *, captions: list[dict[str, Any]],
     shot_timeline: list[dict[str, Any]], starts: dict[str, float], source_media: Path, target: Path,
@@ -150,8 +167,9 @@ def render_short(
             pieces.append((Path(shot["image"]).resolve(), high - low))
     if not pieces:
         raise PipelineError("No shots overlap the requested short segment.")
-    window = [{**c, "start": max(0.0, c["start"] - begin), "end": min(duration, c["end"] - begin)}
-              for c in captions if c["end"] > begin and c["start"] < end]
+    window = clip_captions(captions, begin, end)
+    if not window:
+        raise PipelineError("No readable captions overlap the requested short segment.")
     work = target.parent / f"{target.stem}.work"
     fonts = work / "fonts"
     fonts.mkdir(parents=True, exist_ok=True)
